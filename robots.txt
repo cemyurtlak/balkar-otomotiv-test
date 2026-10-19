@@ -1,0 +1,3 @@
+# TEST MODU: arama motorlarına kapalı
+User-agent: *
+Disallow: /
