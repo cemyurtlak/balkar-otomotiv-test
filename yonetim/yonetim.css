@@ -47,3 +47,4 @@ summary { cursor: pointer; color: var(--a); margin-bottom: 10px; }
 .y-rozet { font-size: .72rem; background: var(--a); color: #1a1408; border-radius: 999px; padding: 1px 8px; }
 .y-grup { border: 1px solid var(--c); border-radius: 10px; padding: 12px 14px 4px; margin: 0 0 14px; }
 .y-grup legend { color: var(--a); padding: 0 6px; }
+[hidden] { display: none !important; }

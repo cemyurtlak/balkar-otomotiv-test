@@ -1,4 +1,5 @@
 # yedekler ve aktarım dosyaları dışarıdan okunamaz
+Options -Indexes
 RedirectMatch 403 ^/veri/yedek/
 <FilesMatch "\.(php|phtml|phar)$">
   Require all denied

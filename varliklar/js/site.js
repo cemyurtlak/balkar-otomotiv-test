@@ -121,12 +121,6 @@
     $$("[data-wa]").forEach(function (a) { a.href = wa(t("ortak.wa_genel_mesaj")); a.target = "_blank"; a.rel = "noopener"; });
     $$("[data-arac-sayisi]").forEach(function (b) { b.textContent = ARACLAR.length; });
 
-    $$("[data-harita-ac]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var k = b.closest("[data-harita]");
-        k.innerHTML = '<iframe src="' + kacis(k.dataset.harita) + '" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Google Maps" allowfullscreen></iframe>';
-      });
-    });
     $$("[data-kaydir]").forEach(function (b) {
       b.addEventListener("click", function () {
         var k = $("[data-kaydirici]", b.closest("section"));
@@ -144,8 +138,11 @@
     var oc = $("[data-one-cikan]");
     if (oc && ARACLAR.length) {
       var a = ARACLAR.filter(function (x) { return x.one_cikan; })[0] || sirala(ARACLAR, "yeni")[0];
+      /* köşe yazısı panelden seçilir: yeni | one_cikan | ozel (panelde yazılan, 4 dil) | "" (yazı yok); alan yoksa "Yeni eklendi" */
+      var tur = a.one_cikan_etiket == null ? "yeni" : a.one_cikan_etiket;
+      var etiket = tur === "yeni" ? t("arac.yeni") : tur === "one_cikan" ? t("arac.one_cikan") : tur === "ozel" ? cokDilli(a.one_cikan_ozel) : "";
       oc.innerHTML = '<a class="one-cikan" href="' + aracLink(a) + '"><div class="foto">' + fotoHTML(a, true) + "</div>" +
-        '<span class="one-cikan-etiket">' + kacis(t("arac.yeni")) + "</span>" +
+        (etiket ? '<span class="one-cikan-etiket">' + kacis(etiket) + "</span>" : "") +
         '<div class="one-cikan-bilgi"><div><h2>' + kacis(aracAdi(a)) + "</h2><p>" + kacis([a.yil, a.model, a.km != null ? sayi(a.km) + " km" : ""].filter(Boolean).join(", ")) + "</p></div>" +
         '<span class="one-cikan-fiyat">' + para(a.fiyat) + "</span></div></a>";
     }
@@ -342,6 +339,119 @@
   }
 
   /* ---------------- WhatsApp formları */
+  /* ---------- Aracını sat: isteğe bağlı fotoğraflar (en fazla data-maks, tarayıcıda 1600 px'e küçültülür,
+     sunucuya yüklenir; WhatsApp mesajına tek galeri bağlantısı eklenir). Yükleme olmazsa mesaj yine gider. */
+  var MAKS_HAM = 25 * 1024 * 1024;           // tarayıcıda işlenecek en büyük ham dosya
+  function fotoKutusu(form) {
+    var kutu = $("[data-foto-yukle]", form);
+    if (!kutu) { return; }
+    var maks = Number(kutu.dataset.maks) || 8, sec = $("[data-foto-sec]", kutu), liste = $("[data-foto-liste]", kutu),
+      sayac = $("[data-foto-sayac]", kutu), uyari = $("[data-foto-uyari]", kutu);
+    form._fotolar = [];
+    function ciz() {
+      liste.innerHTML = "";
+      form._fotolar.forEach(function (f, i) {
+        var d = document.createElement("div"); d.className = "foto-oge";
+        var im = document.createElement("img"); im.alt = ""; im.src = f.onizleme; d.appendChild(im);
+        var b = document.createElement("button"); b.type = "button"; b.className = "foto-sil"; b.setAttribute("aria-label", t("sayfalar.sat_foto_kaldir")); b.textContent = "×";
+        b.addEventListener("click", function () { URL.revokeObjectURL(f.onizleme); form._fotolar.splice(i, 1); uyari.hidden = true; ciz(); });
+        d.appendChild(b); liste.appendChild(d);
+      });
+      sayac.textContent = form._fotolar.length ? t("sayfalar.sat_foto_sayac", { adet: form._fotolar.length, n: maks }) : "";
+      $(".foto-ekle", kutu).classList.toggle("pasif", form._fotolar.length >= maks);
+    }
+    sec.addEventListener("change", function () {
+      var fazla = false;
+      Array.prototype.forEach.call(sec.files, function (f) {
+        if (!/^image\//.test(f.type) || f.size > MAKS_HAM) { return; }
+        if (form._fotolar.length >= maks) { fazla = true; return; }
+        form._fotolar.push({ dosya: f, onizleme: URL.createObjectURL(f) });
+      });
+      sec.value = "";
+      uyari.hidden = !fazla; if (fazla) { uyari.textContent = t("sayfalar.sat_foto_sinir", { n: maks }); }
+      ciz();
+    });
+    ciz();
+  }
+  function kucult(f) {
+    return new Promise(function (tamam) {
+      var img = new Image(), u = URL.createObjectURL(f);
+      img.onload = function () {
+        var o = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * o); c.height = Math.round(img.naturalHeight * o);
+        var x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(u);
+        c.toBlob(function (b) { tamam(b || f); }, "image/jpeg", 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(u); tamam(f); };
+      img.src = u;
+    });
+  }
+  function gonder(form, satirlar) {
+    var fotolar = form._fotolar || [];
+    if (!fotolar.length) { window.open(wa(satirlar.join("\n")), "_blank", "noopener"); return; }
+    var kutu = $("[data-foto-yukle]", form), uyari = $("[data-foto-uyari]", kutu), dugme = $('button[type="submit"]', form);
+    /* pencere tıklama anında açılır (sonradan açılırsa tarayıcı engeller), yükleme bitince WhatsApp'a yönlendirilir */
+    var pencere = window.open("", "_blank");
+    if (pencere) { try { pencere.opener = null; pencere.document.title = "WhatsApp"; pencere.document.body.innerHTML = '<p style="font:16px system-ui;padding:24px">' + kacis(t("sayfalar.sat_foto_yukleniyor")) + "</p>"; } catch (e) { /* farklı köken */ } }
+    var eskiYazi = dugme.innerHTML; dugme.disabled = true; dugme.textContent = t("sayfalar.sat_foto_yukleniyor"); uyari.hidden = true;
+    function bitir(link, hata) {
+      if (link) { satirlar.push(t("sayfalar.sat_foto_wa") + " (" + fotolar.length + "): " + link); }
+      if (hata) { uyari.textContent = t(hata); uyari.hidden = false; }
+      dugme.disabled = false; dugme.innerHTML = eskiYazi;
+      var url = wa(satirlar.join("\n"));
+      if (pencere && !pencere.closed) { pencere.location.href = url; } else { location.href = url; }
+    }
+    Promise.all(fotolar.map(function (f) { return kucult(f.dosya); })).then(function (bloblar) {
+      var fd = new FormData();
+      bloblar.forEach(function (b, i) { fd.append("foto[]", b, "foto" + (i + 1) + ".jpg"); });
+      fd.append("web_adresi", ($('[name="web_adresi"]', form) || {}).value || "");
+      var iptal = window.AbortController ? new AbortController() : null, sure = setTimeout(function () { if (iptal) { iptal.abort(); } }, 60000);
+      return fetch(kutu.dataset.uc, { method: "POST", body: fd, signal: iptal ? iptal.signal : undefined }).then(function (r) {
+        clearTimeout(sure);
+        return r.json().catch(function () { return { ok: false }; }).then(function (j) { j.durum = r.status; return j; });
+      });
+    }).then(function (j) {
+      if (j && j.ok && j.link) { bitir(j.link); } else { bitir(null, j && j.durum === 429 ? "sayfalar.sat_foto_cok" : "sayfalar.sat_foto_hata"); }
+    }).catch(function () { bitir(null, "sayfalar.sat_foto_hata"); });
+  }
+
+  /* ---------- Bilgisayarda "Ara" / telefon numarası: tarayıcı arama yapamadığı için numarayı büyük gösteren pencere.
+     Dokunmatik telefonlarda tel: bağlantısı normal çalışır (doğrudan arama ekranı açılır). */
+  function aramaPenceresi() {
+    if (!window.matchMedia || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) { return; }
+    var d = null;
+    function kur() {
+      d = document.createElement("dialog"); d.className = "ara-pencere"; d.setAttribute("aria-labelledby", "ara-baslik");
+      d.innerHTML = '<button type="button" class="ara-kapat" aria-label="' + kacis(t("ortak.kapat")) + '">×</button>' +
+        '<div class="ara-ikon">' + ikon("tel") + "</div>" +
+        '<h2 id="ara-baslik">' + kacis(t("ortak.ara_baslik")) + "</h2>" +
+        '<p class="ara-numara" data-ara-numara></p>' +
+        '<p class="ara-not">' + kacis(t("ortak.ara_not")) + "</p>" +
+        '<p class="ara-saat">' + ikon("saat") + kacis(t("ortak.saat_hafta") + " " + AYAR.saat + " · " + t("ortak.saat_pazar") + ": " + t("ortak.kapali")) + "</p>" +
+        '<div class="ara-dugmeler"><button type="button" class="dugme dugme-cizgi" data-ara-kopyala>' + ikon("belge") + "<span>" + kacis(t("ortak.ara_kopyala")) + "</span></button>" +
+        '<a class="dugme dugme-altin" target="_blank" rel="noopener" href="' + kacis(wa(t("ortak.wa_genel_mesaj"))) + '">' + ikon("mesaj") + "WhatsApp</a></div>";
+      document.body.appendChild(d);
+      $(".ara-kapat", d).addEventListener("click", function () { d.close(); });
+      d.addEventListener("click", function (e) { if (e.target === d) { d.close(); } });   /* dışına tıklayınca kapanır */
+      $("[data-ara-kopyala]", d).addEventListener("click", function () {
+        var b = this, yazi = $("span", b), numara = d.dataset.numara;
+        function oldu() { yazi.textContent = t("ortak.ara_kopyalandi"); setTimeout(function () { yazi.textContent = t("ortak.ara_kopyala"); }, 2000); }
+        if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(numara).then(oldu, oldu); }
+        else { var g = document.createElement("textarea"); g.value = numara; document.body.appendChild(g); g.select(); try { document.execCommand("copy"); } catch (e) {} g.remove(); oldu(); }
+      });
+    }
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest('a[href^="tel:"]');
+      if (!a) { return; }
+      e.preventDefault();
+      if (!d) { kur(); }
+      var ham = a.getAttribute("href").slice(4), gorunen = ham === AYAR.telefon ? AYAR.telefon_gorunen : ham.replace(/^\+90/, "0");
+      d.dataset.numara = gorunen; $("[data-ara-numara]", d).textContent = gorunen;
+      if (d.showModal) { d.showModal(); } else { d.setAttribute("open", ""); }
+    });
+  }
+
   function formlar() {
     $$("[data-wa-form]").forEach(function (form) {
       form.addEventListener("submit", function (e) {
@@ -361,8 +471,9 @@
           var v = el.tagName === "SELECT" ? (el.value ? el.options[el.selectedIndex].text : "") : String(el.value).trim();
           if (v) { satirlar.push(el.dataset.etiket + ": " + v); }
         });
-        window.open(wa(satirlar.join("\n")), "_blank", "noopener");
+        gonder(form, satirlar);
       });
+      fotoKutusu(form);
       $$("input,select,textarea", form).forEach(function (el) {
         el.addEventListener("input", function () { var k = el.closest(".alan, .onay"); if (k) { k.classList.remove("hatali"); } });
         el.addEventListener("change", function () { var k = el.closest(".alan, .onay"); if (k) { k.classList.remove("hatali"); } });
@@ -370,6 +481,11 @@
     });
     var arac = $("[data-arac-doldur]"), p = new URLSearchParams(location.search);
     if (arac && p.get("arac")) { arac.value = p.get("arac"); }
+    /* hizmetler sayfasından gelen seçim: aracini-sat.html?istek=sat | takas | fiyat */
+    if (p.get("istek")) {
+      var secim = $('input[name="istek"][data-istek="' + p.get("istek").replace(/[^a-z]/g, "") + '"]');
+      if (secim) { secim.checked = true; secim.dispatchEvent(new Event("change", { bubbles: true })); }
+    }
     var tarih = $("[data-tarih-sinir]");
     if (tarih) {
       var d = new Date(); tarih.min = d.toISOString().slice(0, 10);
@@ -381,7 +497,47 @@
     }
   }
 
+  /* ---------- ölçülü animasyonlar: bölümler ve kartlar ekrana girerken yumuşakça belirir.
+     Hareket azaltma tercihi açıksa veya tarayıcı desteklemiyorsa hiç çalışmaz (içerik hep görünür). */
+  function animasyonlar() {
+    var ust = $("#ust");
+    if (ust) {
+      var golge = function () { ust.classList.toggle("kaydirildi", window.scrollY > 8); };
+      golge(); window.addEventListener("scroll", golge, { passive: true });
+    }
+    if (!("IntersectionObserver" in window) || !window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
+    var SECICI = ".bolum-bas, .arac-kart, .ilke, .adimlar li, .yorumlar, .yazi-kart, .hizmet, .deger, .ekip-kisi, .kredi-bant, " +
+      ".guven-oge, .detay-bilgi, .detay-hasar, .detay-aciklama, .kart-form, .yan-bilgi section, .iletisim-bant-ic > *, .harita, .kredi-sonuc, .makale > *";
+    document.documentElement.classList.add("anim");
+    var gozcu = new IntersectionObserver(function (girdiler) {
+      girdiler.forEach(function (g) {
+        if (!g.isIntersecting) { return; }
+        var el = g.target; gozcu.unobserve(el);
+        el.classList.add("gorundu");
+        /* belirme bitince sınıfları kaldır: üzerine gelme (hover) efektleri normal çalışsın */
+        setTimeout(function () { el.classList.remove("gor", "gorundu"); el.style.removeProperty("--gec"); }, 1200);
+      });
+    }, { rootMargin: "0px 0px -40px 0px", threshold: 0.08 });
+    function hazirla(kok) {
+      var liste = (kok.matches && kok.matches(SECICI)) ? [kok] : [];
+      liste = liste.concat($$(SECICI, kok));
+      liste.forEach(function (el) {
+        if (el.classList.contains("gor") || el.dataset.anim) { return; }
+        el.dataset.anim = "1";
+        var kardesler = el.parentElement ? Array.prototype.indexOf.call(el.parentElement.children, el) : 0;
+        el.style.setProperty("--gec", (Math.min(kardesler, 5) * 70) + "ms");   /* yan yana öğeler sırayla */
+        el.classList.add("gor");
+        gozcu.observe(el);
+      });
+    }
+    hazirla(document.body);
+    /* araç kartları JS ile sonradan eklendiği için (vitrin, liste, filtre) yeni öğeleri de yakala */
+    new MutationObserver(function (degisim) {
+      degisim.forEach(function (d) { d.addedNodes.forEach(function (n) { if (n.nodeType === 1) { hazirla(n); } }); });
+    }).observe(document.getElementById("icerik") || document.body, { childList: true, subtree: true });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
-    markaSecicileri(); arayuz(); anasayfa(); liste(); detay(); kredi(); formlar();
+    markaSecicileri(); arayuz(); anasayfa(); liste(); detay(); kredi(); formlar(); aramaPenceresi(); animasyonlar();
   });
 })();

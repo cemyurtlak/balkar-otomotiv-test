@@ -100,6 +100,8 @@ if ($post) {
             'sahibinden_url' => trim((string)$_POST['sahibinden_url']),
             'ilan_tarihi' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$_POST['ilan_tarihi']) ? $_POST['ilan_tarihi'] : date('Y-m-d'),
             'one_cikan' => !empty($_POST['one_cikan']),
+            'one_cikan_etiket' => in_array($_POST['one_cikan_etiket'] ?? 'yeni', ['yeni', 'one_cikan', 'ozel', ''], true) ? (string)($_POST['one_cikan_etiket'] ?? 'yeni') : 'yeni',
+            'one_cikan_ozel' => array_filter(['tr' => mb_substr(trim((string)($_POST['one_cikan_ozel_tr'] ?? '')), 0, 30), 'en' => mb_substr(trim((string)($_POST['one_cikan_ozel_en'] ?? '')), 0, 30), 'ru' => mb_substr(trim((string)($_POST['one_cikan_ozel_ru'] ?? '')), 0, 30), 'de' => mb_substr(trim((string)($_POST['one_cikan_ozel_de'] ?? '')), 0, 30)], fn($x) => $x !== ''),
             'durum' => !empty($_POST['satildi']) ? 'satildi' : 'satista',
             'kaynak' => $eski['kaynak'] ?? 'elle',
             'servis_garantisi' => !empty($_POST['servis_garantisi']),
@@ -115,6 +117,7 @@ if ($post) {
         $tramer = trim((string)($_POST['hasar_tramer'] ?? ''));
         $a['hasar'] = ['degisen' => $hp('degisen'), 'boya' => $hp('boya'), 'lokal' => $hp('lokal'),
             'tramer_tl' => $tramer === '' ? null : sayi_temizle($tramer) ?? 0, 'agir_hasar' => !empty($_POST['hasar_agir'])];
+        if ($a['one_cikan_etiket'] === 'ozel' && empty($a['one_cikan_ozel']['tr'])) { $a['one_cikan_etiket'] = ''; }
         if ($a['marka'] === '' || !$a['fiyat']) { git('index.php?s=duzenle&id=' . urlencode($id), 'Marka ve fiyat zorunlu.', true); }
         if (!$a['aciklama']) { $a['aciklama'] = ['tr' => '']; }
         if ($a['one_cikan']) { foreach ($v['araclar'] as &$x) { $x['one_cikan'] = false; } unset($x); }
@@ -163,6 +166,7 @@ if ($post) {
                 // panelden elle girilen çeviriler ve öne çıkarma korunur
                 $a['aciklama'] = array_merge($e['aciklama'] ?? [], array_filter($a['aciklama'] ?? []));
                 $a['one_cikan'] = !empty($e['one_cikan']);
+                foreach (['one_cikan_etiket', 'one_cikan_ozel'] as $k) { if (array_key_exists($k, $e)) { $a[$k] = $e[$k]; } }
                 foreach (['kasa', 'cekis', 'motor_gucu', 'motor_hacmi', 'yakit', 'vites', 'renk', 'hasar', 'servis_garantisi'] as $k) { if (empty($a[$k]) && isset($e[$k])) { $a[$k] = $e[$k]; } }
                 if (!$a['fotograflar'] && !empty($e['fotograflar'])) { $a['fotograflar'] = $e['fotograflar']; }
             }
@@ -240,11 +244,33 @@ if ($s === 'duzenle') {
         </details>
         <label class="y-tam">Fotoğraf adresleri (her satıra bir adres; ilk satır kapak fotoğrafı)<textarea name="fotograflar" rows="5"><?= h(implode("\n", $a['fotograflar'] ?? [])) ?></textarea></label>
         <label class="y-tam">Bilgisayardan fotoğraf ekle (JPG, PNG, WEBP – en fazla 10 MB)<input type="file" name="foto_yukle[]" accept="image/jpeg,image/png,image/webp" multiple></label>
-        <label class="y-onay"><input type="checkbox" name="one_cikan" <?= !empty($a['one_cikan']) ? 'checked' : '' ?>> Anasayfada büyük göster (öne çıkan)</label>
+        <fieldset class="y-tam y-grup"><legend>Anasayfada öne çıkarma</legend>
+          <label class="y-onay"><input type="checkbox" name="one_cikan" <?= !empty($a['one_cikan']) ? 'checked' : '' ?>> Anasayfada büyük göster (öne çıkan)</label>
+          <?php $et = $a['one_cikan_etiket'] ?? 'yeni'; $oz = $a['one_cikan_ozel'] ?? []; ?>
+          <label>Büyük kartın köşesindeki yazı
+            <select name="one_cikan_etiket" data-etiket-sec>
+              <option value="yeni" <?= $et === 'yeni' ? 'selected' : '' ?>>Yeni eklendi</option>
+              <option value="one_cikan" <?= $et === 'one_cikan' ? 'selected' : '' ?>>Öne çıkan</option>
+              <option value="ozel" <?= $et === 'ozel' ? 'selected' : '' ?>>Kendi yazım</option>
+              <option value="" <?= $et === '' ? 'selected' : '' ?>>Hiçbir şey yazmasın</option>
+            </select>
+          </label>
+          <div class="y-izgara" data-etiket-ozel <?= $et === 'ozel' ? '' : 'hidden' ?>>
+            <label>Kendi yazınız (Türkçe)<input name="one_cikan_ozel_tr" maxlength="30" value="<?= h($oz['tr'] ?? '') ?>" placeholder="Örn. Fırsat aracı"></label>
+            <label>English<input name="one_cikan_ozel_en" maxlength="30" value="<?= h($oz['en'] ?? '') ?>" placeholder="Great deal"></label>
+            <label>Русский<input name="one_cikan_ozel_ru" maxlength="30" value="<?= h($oz['ru'] ?? '') ?>" placeholder="Выгодное предложение"></label>
+            <label>Deutsch<input name="one_cikan_ozel_de" maxlength="30" value="<?= h($oz['de'] ?? '') ?>" placeholder="Top-Angebot"></label>
+          </div>
+          <p class="y-not">"Yeni eklendi" ve "Öne çıkan" 4 dilde otomatik çevrilir. Kendi yazınızın diğer dilleri boş kalırsa o dillerde Türkçe yazı gösterilir. En fazla 30 karakter.</p>
+        </fieldset>
         <label class="y-onay"><input type="checkbox" name="satildi" <?= ($a['durum'] ?? '') === 'satildi' ? 'checked' : '' ?>> Satıldı (sitede gizle)</label>
       </div>
       <button class="y-btn">Kaydet</button> <a href="index.php">Vazgeç</a>
     </form>
+    <script>
+      (function () { var s = document.querySelector('[data-etiket-sec]'), o = document.querySelector('[data-etiket-ozel]');
+        if (s && o) { s.addEventListener('change', function () { o.hidden = s.value !== 'ozel'; }); } })();
+    </script>
     <?php sablon_son(); exit;
 }
 

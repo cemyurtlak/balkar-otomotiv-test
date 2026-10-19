@@ -117,14 +117,58 @@
 /* krem ↔ altın geçişli bölümler — anasayfa sırası: 3 vitrin, 5 adımlar, 6 yorumlar, 7 kredi, 8 rehber, 9 iletişim.
    Geçişler düz dikey (180°): border-image alanı ekranın 3 katı genişlikte olduğundan açılı geçiş yatay kayar.
    Yön sırayla değişir: bir bölüm altınla bitiyorsa sonraki altınla başlar, sınırlarda kopma olmaz. */
-#icerik > section:nth-of-type(3), #icerik > section:nth-of-type(5),
-#icerik > section:nth-of-type(7), #icerik > section:nth-of-type(9) {
+.sayfa-anasayfa #icerik > section:nth-of-type(3), .sayfa-anasayfa #icerik > section:nth-of-type(5),
+.sayfa-anasayfa #icerik > section:nth-of-type(7), .sayfa-anasayfa #icerik > section:nth-of-type(9) {
   background: none; border-image: var(--krem-altin) fill 0 / / 0 100vw;
 }
-#icerik > section:nth-of-type(6), #icerik > section:nth-of-type(8) {
+.sayfa-anasayfa #icerik > section:nth-of-type(6), .sayfa-anasayfa #icerik > section:nth-of-type(8) {
   background: none; border-image: var(--altin-krem) fill 0 / / 0 100vw;
 }
 /* kredi bandı bölümü: gereksiz üst boşluk kaldırıldı, alta da eşit boşluk */
 .kredi-dis { padding-block: 0; }
 /* yetki belgesi satırının üstündeki boşluk azaltıldı */
 .kahraman { padding-top: 12px; }
+
+/* ---------- alt sayfalar ---------- */
+/* sayfa başlıkları (Araçlar, Aracını sat, Kredi, Hizmetler, Rehber, İletişim, KVKK, Hakkımızda):
+   anasayfa kahramanı gibi tam genişlik lacivert → siyah bant, krem başlık, altın alt çizgi */
+.sayfa-bas, .hk-ust {
+  position: relative; z-index: 0; margin-bottom: clamp(24px, 3vw, 40px);
+  --metin: #f6f0e4; --soluk: #b9c3d6; --ikincil: #dde3ee; --altin-metin: #dcb965;
+  --cizgi: #ffffff1f; --cizgi-guclu: #ffffff38;
+  color: var(--metin);
+}
+.sayfa-bas::before, .hk-ust::before {
+  content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: calc(50% - 50vw); right: calc(50% - 50vw);
+  background: var(--lacivert-gecis);
+}
+.sayfa-bas { padding-top: clamp(20px, 2.5vw, 32px); padding-bottom: clamp(24px, 3vw, 36px); }
+.hk-ust { padding-top: clamp(20px, 2.5vw, 32px); padding-bottom: clamp(24px, 3vw, 40px); }
+.sayfa-baslik { background: none; color: var(--lacivert); -webkit-text-fill-color: currentColor; }   /* krem zeminde (makale, KVKK) lacivert */
+.sayfa-bas .sayfa-baslik, .hk-ust .sayfa-baslik { color: #f6f0e4; }                                   /* koyu bantta krem */
+.makale .giris { color: var(--ikincil); }
+.sayfa-baslik::after { content: ""; display: block; width: 72px; height: 3px; margin-top: 16px; border-radius: 3px; background: var(--varak); }
+.hk-ust h1 { color: #f6f0e4; }
+.hk-ust .giris { color: #e6ebf3; }
+.hk-ust p:not(.giris) { color: #c9d1e0; }
+.hk-ust a { color: #dcb965; }
+
+/* araç detayı */
+.geri:hover { color: var(--lacivert); }
+.detay-fiyat { background: none; color: var(--lacivert); -webkit-text-fill-color: var(--lacivert); }
+.detay-ozet { background: var(--yuzey); border-top: 3px solid var(--altin); box-shadow: var(--golge); }
+.detay-kategori { color: var(--altin-koyu); }
+.galeri-kucuk button[aria-current="true"], .galeri-kucuk button.secili { border-color: var(--altin); }
+
+/* kredi sonuç paneli: lacivert → siyah, yazılar açık (önceden döküm değerleri koyu zeminde okunmuyordu) */
+.kredi-sonuc {
+  --zemin: #142a4c; --zemin-2: #1a3460; --yuzey: #1d3a66;
+  --cizgi: #ffffff1f; --cizgi-guclu: #ffffff38;
+  --metin: #f6f0e4; --soluk: #b9c3d6; --ikincil: #dde3ee; --altin-metin: #dcb965;
+  color: var(--metin); background: var(--lacivert-gecis); border-color: #c9a24e80;
+}
+.kredi-sonuc dd, .kredi-sonuc b, .kredi-sonuc strong { color: #f6f0e4; }
+
+/* hakkımızda: iki koyu bant art arda — aradaki krem şerit yerine ince altın çizgi */
+.hk-ust { margin-bottom: 0; }
+.hk-ust + .bolum-koyu { border-top: 1px solid #c9a24e59; }
