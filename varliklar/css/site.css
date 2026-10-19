@@ -19,7 +19,7 @@
   --r-orta: 16px;
   --r-buyuk: 24px;
   --kap: 1200px;
-  --bosluk: clamp(56px, 8vw, 104px);
+  --bosluk: clamp(28px, 3vw, 44px);
   color-scheme: dark;
 }
 
@@ -255,7 +255,7 @@ p { margin: 0 0 1em; }
 /* ---------- kredi bandı, cta */
 .kredi-bant, .cta-bant { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
 .kredi-bant { border: 1px solid var(--cizgi-guclu); border-radius: var(--r-buyuk); padding: clamp(24px, 4vw, 44px); background: linear-gradient(120deg, #2a2213 0%, var(--zemin-2) 60%); }
-.kredi-dis { padding-top: var(--bosluk); }
+.kredi-dis { padding-top: 0; } /* üstteki yorum bölümünün alt boşluğu yeterli */
 .cta-bant { padding-bottom: var(--bosluk); }
 
 /* ---------- yazılar */
