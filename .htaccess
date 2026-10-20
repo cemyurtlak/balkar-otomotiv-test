@@ -8,6 +8,14 @@ DirectoryIndex index.html index.php
 # RewriteCond %{HTTPS} off
 # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+# Araç sayfası paylaşılınca (WhatsApp, Facebook, Instagram...) önizlemede aracın fotoğrafı, adı ve fiyatı görünsün:
+# ".../tr/arac.html?id=123" isteği arac.php'ye gider; sayfa aynı kalır, yalnızca paylaşım etiketleri doldurulur.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{QUERY_STRING} (^|&)id=[0-9]+
+  RewriteRule ^(tr|en|ru|de)/arac\.html$ arac.php?dil=$1 [QSA,L]
+</IfModule>
+
 <IfModule mod_headers.c>
   Header set X-Content-Type-Options "nosniff"
   Header set Referrer-Policy "strict-origin-when-cross-origin"

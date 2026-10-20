@@ -209,6 +209,24 @@
     uygula();
   }
 
+  /* ---------------- araç detay: arama motorları için yapılandırılmış veri (Car + teklif) ve sayfa açıklaması */
+  function aracYapisalVeri(a) {
+    var ac = t("arac.paylasim_aciklama", { yil: a.yil, km: sayi(a.km || 0), yakit: a.yakit ? t("arac.yakit_" + a.yakit) : "", vites: a.vites ? t("arac.vites_" + a.vites) : "" });
+    var md = $('meta[name="description"]'); if (md) { md.setAttribute("content", ac); }
+    if ($("script[data-arac-ld]")) { return; }   // sunucu (arac.php) zaten eklediyse tekrar ekleme
+    var yakit = { benzin: "Gasoline", dizel: "Diesel", hibrit: "Hybrid", elektrik: "Electric", lpg: "LPG" };
+    var veri = { "@context": "https://schema.org", "@type": a.kategori === "motosiklet" ? "Motorcycle" : "Car",
+      name: aracTamAd(a), brand: { "@type": "Brand", name: a.marka }, model: [seriAdi(a), a.model].filter(Boolean).join(" "),
+      vehicleModelDate: String(a.yil), mileageFromOdometer: { "@type": "QuantitativeValue", value: a.km || 0, unitCode: "KMT" },
+      fuelType: yakit[a.yakit] || a.yakit, vehicleTransmission: a.vites ? t("arac.vites_" + a.vites) : undefined, color: a.renk || undefined,
+      itemCondition: "https://schema.org/UsedCondition", description: ac, url: location.href.split("#")[0],
+      image: (a.fotograflar || []).slice(0, 5).map(function (u) { return u.replace("/x5_", "/x16_"); }),
+      offers: { "@type": "Offer", price: a.fiyat, priceCurrency: "TRY", availability: "https://schema.org/InStock", itemCondition: "https://schema.org/UsedCondition",
+        seller: { "@type": "AutoDealer", name: "Balkar Otomotiv", telephone: AYAR.telefon } } };
+    var s = document.createElement("script"); s.type = "application/ld+json"; s.setAttribute("data-arac-ld", "");
+    s.textContent = JSON.stringify(veri); document.head.appendChild(s);
+  }
+
   /* ---------------- araç detay */
   function detay() {
     var kok = $("[data-detay]");
@@ -218,6 +236,7 @@
     if (!a) { $("[data-bulunamadi]").hidden = false; return; }
     kok.hidden = false;
     document.title = aracTamAd(a) + " – " + para(a.fiyat) + " | Balkar Otomotiv";
+    aracYapisalVeri(a);
     function alan(ad, html) { var e = $('[data-alan="' + ad + '"]', kok); if (e) { e.innerHTML = html; } }
     alan("kategori", kacis(t("arac.kategori_" + a.kategori)));
     alan("baslik", kacis(a.yil + " " + aracAdi(a)));
