@@ -38,6 +38,7 @@
     return { en: x + " Series", ru: x + " серии", de: bmw ? x + "er" : x + "-Serie" }[DIL];
   }
   function aracAdi(a) { return [a.marka, seriAdi(a)].filter(Boolean).join(" "); }
+  function yilGecerli(v) { var y = Number(v); return /^\d{4}$/.test(String(v)) && y >= 1900 && y <= new Date().getFullYear() + 1; }
   function aracTamAd(a) { return [a.yil, a.marka, seriAdi(a), a.model].filter(Boolean).join(" "); }
   function aracLink(a) { return "arac.html?id=" + encodeURIComponent(a.id); }
   function yeniMi(a) {
@@ -88,9 +89,9 @@
         var o = document.createElement("option"); o.value = m; o.textContent = m + " (" + markalar[m] + ")"; s.appendChild(o);
       });
     });
-    $$("[data-yil-secici]").forEach(function (s) {
-      var bu = new Date().getFullYear() + 1;
-      for (var y = bu; y >= 1990; y--) { var o = document.createElement("option"); o.value = y; o.textContent = y; s.appendChild(o); }
+    /* model yılı serbest yazılır (liste yok: yıllar geçince güncelleme gerekmez, eski araçlar da girilebilir); yalnızca rakam kabul edilir */
+    $$("[data-yil-alan]").forEach(function (el) {
+      el.addEventListener("input", function () { var v = el.value.replace(/\D/g, "").slice(0, 4); if (v !== el.value) { el.value = v; } });
     });
   }
 
@@ -166,7 +167,7 @@
         if (f.marka && a.marka !== f.marka) { return false; }
         if (f.yakit && a.yakit !== f.yakit) { return false; }
         if (f.vites && a.vites !== f.vites) { return false; }
-        if (f.yil && (a.yil || 0) < Number(f.yil)) { return false; }
+        if (f.yil.length === 4 && (a.yil || 0) < Number(f.yil)) { return false; }
         if (f.fiyat && (a.fiyat || 0) > Number(f.fiyat)) { return false; }
         if (f.km && (a.km || 0) > Number(f.km)) { return false; }
         if (q) {
@@ -482,7 +483,14 @@
           if (bos && tamam) { el.focus(); }
           if (bos) { tamam = false; }
         });
-        $("[data-form-hata]", form).hidden = tamam;
+        var hataYazi = t("ortak.form_hata");
+        $$("[data-yil-alan]", form).forEach(function (el) {   // dolu ise geçerli bir yıl olmalı (1900 – gelecek yıl)
+          if (!el.value || yilGecerli(el.value)) { return; }
+          var kap = el.closest(".alan"); if (kap) { kap.classList.add("hatali"); }
+          if (tamam) { el.focus(); hataYazi = t("ortak.yil_hata"); }
+          tamam = false;
+        });
+        var hata = $("[data-form-hata]", form); hata.textContent = hataYazi; hata.hidden = tamam;
         if (!tamam) { return; }
         var satirlar = ["*" + form.dataset.baslik + "*"];
         $$("[data-etiket]", form).forEach(function (el) {
