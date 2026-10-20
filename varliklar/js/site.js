@@ -23,6 +23,14 @@
   function anahtar(s) {
     return String(s || "").toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s").replace(/ö/g, "o").replace(/ç/g, "c").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
   }
+  /* sabit değerlerin (kategori, yakıt, vites...) dile göre adı; çevirisi olmayan yeni bir değer gelirse olduğu gibi gösterilir */
+  function etiket(alan, deger) {
+    if (deger == null || deger === "") { return ""; }
+    var k = "arac." + alan + "_" + deger;
+    if (T[k] != null) { return T[k]; }
+    var s = String(deger).replace(/_/g, " ");
+    return s.charAt(0).toLocaleUpperCase(YEREL) + s.slice(1);
+  }
   function ceviriVeyaHam(onek, deger) {
     if (!deger) { return ""; }
     var k = "arac." + onek + "_" + anahtar(deger);
@@ -59,8 +67,8 @@
   function kartHTML(a) {
     var oz = [];
     if (a.km != null) { oz.push("<li>" + ikon("gosterge") + sayi(a.km) + " km</li>"); }
-    if (a.yakit) { oz.push("<li>" + ikon("yakit") + kacis(t("arac.yakit_" + a.yakit)) + "</li>"); }
-    if (a.vites) { oz.push("<li>" + ikon("vites") + kacis(t("arac.vites_" + a.vites)) + "</li>"); }
+    if (a.yakit) { oz.push("<li>" + ikon("yakit") + kacis(etiket("yakit", a.yakit)) + "</li>"); }
+    if (a.vites) { oz.push("<li>" + ikon("vites") + kacis(etiket("vites", a.vites)) + "</li>"); }
     return '<a class="arac-kart" href="' + aracLink(a) + '">' +
       '<div class="foto">' + fotoHTML(a) + '<span class="arac-yil">' + kacis(a.yil) + "</span>" +
       (yeniMi(a) ? '<span class="arac-yeni">' + kacis(t("arac.yeni")) + "</span>" : "") +
@@ -81,13 +89,61 @@
     }[sira] || function () { return 0; };
     return k.sort(f);
   }
+  /* Seçim listeleri her zaman satıştaki araçlardan üretilir: yalnızca gerçekten araç olan seçenekler (adetleriyle) görünür,
+     panelden yeni bir marka/kategori/yakıt eklenince liste kendiliğinden güncellenir; hiçbir araç listelerin dışında kalmaz. */
+  var SIRA = {
+    kategori: ["otomobil", "suv", "ticari", "motosiklet"],
+    yakit: ["benzin", "dizel", "lpg", "hibrit", "elektrik"],
+    vites: ["otomatik", "yari_otomatik", "manuel"]
+  };
+  function sayim(alan) {
+    var s = {};
+    ARACLAR.forEach(function (a) { var v = a[alan]; if (v != null && v !== "") { s[v] = (s[v] || 0) + 1; } });
+    return s;
+  }
+  function secenekEkle(s, deger, yazi) { var o = document.createElement("option"); o.value = deger; o.textContent = yazi; s.appendChild(o); }
+  function ilkDisindakileriSil(s) { while (s.options.length > 1) { s.remove(1); } }
+  /* en yüksek fiyat seçenekleri: yuvarlak tutarlar, araç fiyatlarına göre; son seçenek her zaman en pahalı aracı da kapsar */
+  function fiyatBasamaklari() {
+    var f = ARACLAR.map(function (a) { return Number(a.fiyat) || 0; }).filter(function (x) { return x > 0; }).sort(function (a, b) { return a - b; });
+    if (!f.length) { return []; }
+    var fiyatsiz = ARACLAR.length - f.length;   // fiyatı girilmemiş araçlar her fiyat seçiminde listelenir, adete de eklenir
+    var b = [250e3, 500e3, 750e3, 1e6, 1.25e6, 1.5e6, 1.75e6, 2e6, 2.5e6, 3e6, 3.5e6, 4e6, 5e6, 6e6, 7.5e6, 10e6, 12.5e6, 15e6, 20e6, 25e6, 30e6, 40e6, 50e6];
+    while (b[b.length - 1] < f[f.length - 1]) { b.push(b[b.length - 1] * 2); }
+    var aday = [], onceki = 0;
+    for (var i = 0; i < b.length; i++) {
+      var n = f.filter(function (x) { return x <= b[i]; }).length;
+      if (n > onceki) { aday.push({ tutar: b[i], adet: n + fiyatsiz }); onceki = n; }
+      if (n === f.length) { break; }
+    }
+    if (aday.length > 7) {   // çok seçenek olmasın: 6 ara basamak + tümünü kapsayan son basamak
+      var son = aday[aday.length - 1], secilen = [];
+      for (var k = 1; k <= 6; k++) { var x = aday[Math.round(k * (aday.length - 1) / 7)]; if (secilen.indexOf(x) < 0) { secilen.push(x); } }
+      aday = secilen.filter(function (x) { return x !== son; }).concat([son]);
+    }
+    return aday;
+  }
   function markaSecicileri() {
-    var markalar = {};
-    ARACLAR.forEach(function (a) { if (a.marka) { markalar[a.marka] = (markalar[a.marka] || 0) + 1; } });
+    var markalar = sayim("marka");
     $$("[data-marka-secici]").forEach(function (s) {
-      Object.keys(markalar).sort(function (a, b) { return a.localeCompare(b, "tr"); }).forEach(function (m) {
-        var o = document.createElement("option"); o.value = m; o.textContent = m + " (" + markalar[m] + ")"; s.appendChild(o);
+      ilkDisindakileriSil(s);
+      Object.keys(markalar).sort(function (a, b) { return a.localeCompare(b, "tr"); }).forEach(function (m) { secenekEkle(s, m, m + " (" + markalar[m] + ")"); });
+    });
+    ["kategori", "yakit", "vites"].forEach(function (alan) {
+      var say = sayim(alan), sira = SIRA[alan];
+      var degerler = Object.keys(say).sort(function (a, b) {
+        var x = sira.indexOf(a), y = sira.indexOf(b);
+        return (x < 0 ? 99 : x) - (y < 0 ? 99 : y) || a.localeCompare(b, "tr");
       });
+      $$('[data-secenek="' + alan + '"]').forEach(function (s) {
+        ilkDisindakileriSil(s);
+        degerler.forEach(function (v) { secenekEkle(s, v, etiket(alan, v) + " (" + say[v] + ")"); });
+      });
+    });
+    var basamak = fiyatBasamaklari();
+    $$("[data-fiyat-secici]").forEach(function (s) {
+      ilkDisindakileriSil(s);
+      basamak.forEach(function (x) { secenekEkle(s, x.tutar, para(x.tutar) + " (" + x.adet + ")"); });
     });
     /* model yılı serbest yazılır (liste yok: yıllar geçince güncelleme gerekmez, eski araçlar da girilebilir); yalnızca rakam kabul edilir */
     $$("[data-yil-alan]").forEach(function (el) {
@@ -145,7 +201,7 @@
       oc.innerHTML = '<a class="one-cikan" href="' + aracLink(a) + '"><div class="foto">' + fotoHTML(a, true) + "</div>" +
         (etiket ? '<span class="one-cikan-etiket">' + kacis(etiket) + "</span>" : "") +
         '<div class="one-cikan-bilgi"><div><h2>' + kacis(aracAdi(a)) + "</h2><p>" + kacis([a.yil, a.model, a.km != null ? sayi(a.km) + " km" : ""].filter(Boolean).join(", ")) + "</p></div>" +
-        '<span class="one-cikan-fiyat">' + para(a.fiyat) + "</span></div></a>";
+        (a.fiyat ? '<span class="one-cikan-fiyat">' + para(a.fiyat) + "</span>" : "") + "</div></a>";
     }
   }
 
@@ -212,14 +268,14 @@
 
   /* ---------------- araç detay: arama motorları için yapılandırılmış veri (Car + teklif) ve sayfa açıklaması */
   function aracYapisalVeri(a) {
-    var ac = t("arac.paylasim_aciklama", { yil: a.yil, km: sayi(a.km || 0), yakit: a.yakit ? t("arac.yakit_" + a.yakit) : "", vites: a.vites ? t("arac.vites_" + a.vites) : "" });
+    var ac = t("arac.paylasim_aciklama", { yil: a.yil, km: sayi(a.km || 0), yakit: a.yakit ? etiket("yakit", a.yakit) : "", vites: a.vites ? etiket("vites", a.vites) : "" });
     var md = $('meta[name="description"]'); if (md) { md.setAttribute("content", ac); }
     if ($("script[data-arac-ld]")) { return; }   // sunucu (arac.php) zaten eklediyse tekrar ekleme
     var yakit = { benzin: "Gasoline", dizel: "Diesel", hibrit: "Hybrid", elektrik: "Electric", lpg: "LPG" };
     var veri = { "@context": "https://schema.org", "@type": a.kategori === "motosiklet" ? "Motorcycle" : "Car",
       name: aracTamAd(a), brand: { "@type": "Brand", name: a.marka }, model: [seriAdi(a), a.model].filter(Boolean).join(" "),
       vehicleModelDate: String(a.yil), mileageFromOdometer: { "@type": "QuantitativeValue", value: a.km || 0, unitCode: "KMT" },
-      fuelType: yakit[a.yakit] || a.yakit, vehicleTransmission: a.vites ? t("arac.vites_" + a.vites) : undefined, color: a.renk || undefined,
+      fuelType: yakit[a.yakit] || a.yakit, vehicleTransmission: a.vites ? etiket("vites", a.vites) : undefined, color: a.renk || undefined,
       itemCondition: "https://schema.org/UsedCondition", description: ac, url: location.href.split("#")[0],
       image: (a.fotograflar || []).slice(0, 5).map(function (u) { return u.replace("/x5_", "/x16_"); }),
       offers: { "@type": "Offer", price: a.fiyat, priceCurrency: "TRY", availability: "https://schema.org/InStock", itemCondition: "https://schema.org/UsedCondition",
@@ -236,27 +292,27 @@
     var a = ARACLAR.filter(function (x) { return String(x.id) === String(id); })[0];
     if (!a) { $("[data-bulunamadi]").hidden = false; return; }
     kok.hidden = false;
-    document.title = aracTamAd(a) + " – " + para(a.fiyat) + " | Balkar Otomotiv";
+    document.title = aracTamAd(a) + (a.fiyat ? " – " + para(a.fiyat) : "") + " | Balkar Otomotiv";
     aracYapisalVeri(a);
     function alan(ad, html) { var e = $('[data-alan="' + ad + '"]', kok); if (e) { e.innerHTML = html; } }
-    alan("kategori", kacis(t("arac.kategori_" + a.kategori)));
+    alan("kategori", kacis(etiket("kategori", a.kategori)));
     alan("baslik", kacis(a.yil + " " + aracAdi(a)));
     alan("model", kacis(a.model || ""));
     alan("fiyat", a.fiyat ? para(a.fiyat) : "");
     var hizli = [];
     if (a.km != null) { hizli.push(["gosterge", t("arac.km"), sayi(a.km) + " km"]); }
-    if (a.yakit) { hizli.push(["yakit", t("arac.yakit"), t("arac.yakit_" + a.yakit)]); }
-    if (a.vites) { hizli.push(["vites", t("arac.vites"), t("arac.vites_" + a.vites)]); }
+    if (a.yakit) { hizli.push(["yakit", t("arac.yakit"), etiket("yakit", a.yakit)]); }
+    if (a.vites) { hizli.push(["vites", t("arac.vites"), etiket("vites", a.vites)]); }
     hizli.push(["takvim", t("arac.yil"), a.yil]);
     alan("hizli", hizli.slice(0, 4).map(function (h) { return "<li>" + ikon(h[0]) + "<span><small>" + kacis(h[1]) + "</small>" + kacis(h[2]) + "</span></li>"; }).join(""));
 
     var oz = [
       [t("arac.marka"), a.marka], [t("arac.seri_model"), [seriAdi(a), a.model].filter(Boolean).join(" ")],
       [t("arac.yil"), a.yil], [t("arac.km"), a.km != null ? sayi(a.km) + " km" : ""],
-      [t("arac.yakit"), a.yakit ? t("arac.yakit_" + a.yakit) : ""], [t("arac.vites"), a.vites ? t("arac.vites_" + a.vites) : ""],
+      [t("arac.yakit"), a.yakit ? etiket("yakit", a.yakit) : ""], [t("arac.vites"), a.vites ? etiket("vites", a.vites) : ""],
       [t("arac.kasa"), a.kasa ? ceviriVeyaHam("kasa", a.kasa) : ""], [t("arac.renk"), ceviriVeyaHam("renk", a.renk)],
       [t("arac.motor_gucu"), a.motor_gucu], [t("arac.motor_hacmi"), a.motor_hacmi],
-      [t("arac.cekis"), a.cekis ? ceviriVeyaHam("cekis", a.cekis) : ""], [t("arac.kategori"), t("arac.kategori_" + a.kategori)],
+      [t("arac.cekis"), a.cekis ? ceviriVeyaHam("cekis", a.cekis) : ""], [t("arac.kategori"), etiket("kategori", a.kategori)],
       [t("arac.servis_garantisi"), a.servis_garantisi === true ? t("arac.evet") : (a.servis_garantisi === false ? t("arac.hayir") : "")],
       [t("arac.ilan_no"), a.id], [t("arac.ilan_tarihi"), a.ilan_tarihi ? new Date(a.ilan_tarihi).toLocaleDateString(YEREL) : ""]
     ].filter(function (r) { return r[1] !== "" && r[1] != null; });
@@ -319,7 +375,10 @@
     goster(0);
 
     var benzer = ARACLAR.filter(function (x) { return x.id !== a.id; })
-      .sort(function (x, y) { return (x.kategori === a.kategori ? 0 : 1e9) + Math.abs(x.fiyat - a.fiyat) - ((y.kategori === a.kategori ? 0 : 1e9) + Math.abs(y.fiyat - a.fiyat)); })
+      .sort(function (x, y) {   // aynı kategori önce, sonra fiyatı en yakın olan (fiyatı girilmemiş araçta sıralama bozulmaz)
+        function uzak(z) { return (z.kategori === a.kategori ? 0 : 1e12) + Math.abs((Number(z.fiyat) || 0) - (Number(a.fiyat) || 0)); }
+        return uzak(x) - uzak(y);
+      })
       .slice(0, 3);
     if (benzer.length) { $("[data-benzer-bolum]").hidden = false; $("[data-benzer]").innerHTML = benzer.map(kartHTML).join(""); }
   }
