@@ -48,3 +48,21 @@ summary { cursor: pointer; color: var(--a); margin-bottom: 10px; }
 .y-grup { border: 1px solid var(--c); border-radius: 10px; padding: 12px 14px 4px; margin: 0 0 14px; }
 .y-grup legend { color: var(--a); padding: 0 6px; }
 [hidden] { display: none !important; }
+
+/* sahibinden aktarımı önizleme */
+.y-ozet-kutular { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.y-ozet-kutular div { background: var(--y); border-radius: 10px; padding: 12px 14px; display: grid; }
+.y-ozet-kutular b { font-size: 1.6rem; line-height: 1.1; color: var(--a); }
+.y-ozet-kutular span { color: var(--s); font-size: .85rem; }
+.y-grup-bas { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.y-grup-bas h2 { margin: 0; font-size: 1.1rem; } .y-grup-bas h2 small { color: var(--s); font-weight: 400; font-size: .8rem; }
+.y-toplu { display: flex; gap: 6px; } .y-toplu button { font: inherit; font-size: .8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--c); background: transparent; color: inherit; cursor: pointer; }
+.y-toplu button:hover { border-color: var(--a); }
+.y-secim { display: grid; gap: 4px; white-space: nowrap; } .y-secim label { display: flex; gap: 6px; align-items: center; font-size: .88rem; cursor: pointer; }
+.y-fark { margin: 6px 0 0; padding-left: 18px; font-size: .88rem; } .y-fark li { margin: 2px 0; } .y-fark s { opacity: .6; }
+.y-fark details { margin-top: 4px; } .y-iki { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .y-iki p { margin: 2px 0 0; font-size: .82rem; max-height: 240px; overflow: auto; }
+.y-alt-cubuk { position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(to top, var(--z, #111) 70%, transparent); display: flex; gap: 12px; align-items: center; }
+.y-alt-cubuk small { color: var(--s); }
+.y-secim input { min-height: 0; padding: 0; width: auto; accent-color: var(--a); }
+.y-secim label { display: flex !important; flex-direction: row !important; align-items: center; justify-content: flex-start; gap: 8px; margin: 0; text-align: left; }
+.y-tablo td:last-child .y-secim { justify-items: start; }

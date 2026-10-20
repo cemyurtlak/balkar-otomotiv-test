@@ -211,3 +211,85 @@ function satirlari_esle(array $satirlar): array {
     $kullanilmayan = array_values(array_diff_key($tum, $kullanilan));
     return [$araclar, array_keys($kullanilan), $kullanilmayan];
 }
+
+/* ---------- sahibinden dosyası ile sitedeki araçları karşılaştırma
+   Dosyada boş gelen alanlar "değişti" sayılmaz (uygulamada eski değer korunur). */
+const KARSILASTIRILAN = [
+    'fiyat' => 'Fiyat', 'km' => 'Kilometre', 'yil' => 'Yıl', 'marka' => 'Marka', 'seri' => 'Seri', 'model' => 'Model',
+    'baslik' => 'İlan başlığı', 'aciklama' => 'Açıklama', 'renk' => 'Renk', 'yakit' => 'Yakıt', 'vites' => 'Vites',
+    'kasa' => 'Kasa', 'cekis' => 'Çekiş', 'motor_gucu' => 'Motor gücü', 'motor_hacmi' => 'Motor hacmi',
+    'kategori' => 'Kategori', 'fotograflar' => 'Fotoğraflar', 'sahibinden_url' => 'İlan adresi',
+];
+
+function _norm($v): string {
+    if (is_array($v)) { return implode('|', array_map('_norm', $v)); }
+    return trim(preg_replace('/\s+/u', ' ', mb_strtolower((string)($v ?? ''))));
+}
+
+function alan_goster(string $k, $v): string {
+    if ($v === null || $v === '' || $v === []) { return '—'; }
+    switch ($k) {
+        case 'fiyat': return number_format((int)$v, 0, ',', '.') . ' TL';
+        case 'km': return number_format((int)$v, 0, ',', '.') . ' km';
+        case 'yakit': return YAKITLAR[$v] ?? (string)$v;
+        case 'vites': return VITESLER[$v] ?? (string)$v;
+        case 'kasa': return KASALAR[$v] ?? (string)$v;
+        case 'cekis': return CEKISLER[$v] ?? (string)$v;
+        case 'kategori': return KATEGORILER[$v] ?? (string)$v;
+        case 'fotograflar': return count((array)$v) . ' fotoğraf';
+        case 'aciklama': return (string)(is_array($v) ? ($v['tr'] ?? '') : $v);
+        default: return (string)$v;
+    }
+}
+
+/** Dosyadaki bir ilan ile sitedeki hâlini alan alan karşılaştırır: [alan => [eski, yeni]] */
+function ilan_farklari(array $e, array $a): array {
+    $f = [];
+    foreach (array_keys(KARSILASTIRILAN) as $k) {
+        $yeni = $k === 'aciklama' ? ($a['aciklama']['tr'] ?? '') : ($a[$k] ?? null);
+        $eski = $k === 'aciklama' ? ($e['aciklama']['tr'] ?? '') : ($e[$k] ?? null);
+        if ($yeni === null || $yeni === '' || $yeni === []) { continue; }          // dosyada yok → eski korunur
+        if ($k === 'fotograflar') {
+            $ey = array_map(fn($u) => preg_replace('#/x\d+_#', '/', (string)$u), (array)$eski);
+            $yy = array_map(fn($u) => preg_replace('#/x\d+_#', '/', (string)$u), (array)$yeni);
+            if ($ey !== $yy) { $f[$k] = [$eski, $yeni]; }
+            continue;
+        }
+        if (in_array($k, ['fiyat', 'km', 'yil'], true)) { if ((int)$eski !== (int)$yeni) { $f[$k] = [$eski, $yeni]; } continue; }
+        if (_norm($eski) !== _norm($yeni)) { $f[$k] = [$eski, $yeni]; }
+    }
+    if (($e['durum'] ?? '') === 'satildi') { $f['durum'] = ['satildi', 'satista']; }   // sitede satıldı, sahibinden'de yeniden yayında
+    return $f;
+}
+
+/** Dört grup: yeni, degisen, ayni, eksik (sitede var, dosyada yok) */
+function aktarim_karsilastir(array $site, array $dosya): array {
+    $mevcut = [];
+    foreach ($site as $e) { $mevcut[(string)$e['id']] = $e; }
+    $sonuc = ['yeni' => [], 'degisen' => [], 'ayni' => [], 'eksik' => []];
+    $gorulen = [];
+    foreach ($dosya as $a) {
+        $id = (string)$a['id']; $gorulen[$id] = true;
+        if (!isset($mevcut[$id])) { $sonuc['yeni'][] = $a; continue; }
+        $f = ilan_farklari($mevcut[$id], $a);
+        if ($f) { $sonuc['degisen'][] = ['eski' => $mevcut[$id], 'yeni' => $a, 'farklar' => $f]; } else { $sonuc['ayni'][] = $mevcut[$id]; }
+    }
+    foreach ($site as $e) {
+        if (!isset($gorulen[(string)$e['id']]) && ($e['durum'] ?? '') !== 'satildi') { $sonuc['eksik'][] = $e; }
+    }
+    return $sonuc;
+}
+
+/** Güncellemede sitede elle girilenler korunur; Türkçe açıklama değiştiyse eski çeviriler (artık yanlış) silinir. */
+function ilan_birlestir(array $e, array $a): array {
+    $trDegisti = ($a['aciklama']['tr'] ?? '') !== '' && _norm($a['aciklama']['tr']) !== _norm($e['aciklama']['tr'] ?? '');
+    $sonuc = $e;
+    foreach ($a as $k => $v) {
+        if (in_array($k, ['one_cikan', 'kaynak', 'ilan_tarihi'], true)) { continue; }
+        if ($k === 'aciklama') { $sonuc['aciklama'] = $trDegisti ? ['tr' => $a['aciklama']['tr']] : array_merge($e['aciklama'] ?? [], array_filter($a['aciklama'] ?? [])); continue; }
+        if ($v === null || $v === '' || $v === []) { continue; }
+        $sonuc[$k] = $v;
+    }
+    $sonuc['durum'] = 'satista';
+    return $sonuc;
+}

@@ -157,29 +157,37 @@ if ($post) {
         $yol = YEDEK . '/' . basename($g);
         if ($g === '' || !is_file($yol)) { git('index.php?s=aktar', 'Önizleme bulunamadı, dosyayı yeniden yükleyin.', true); }
         $p = json_decode((string)file_get_contents($yol), true);
-        $eskiler = [];
-        foreach ($v['araclar'] as $a) { $eskiler[(string)$a['id']] = $a; }
-        $yeni = [];
-        foreach ($p['araclar'] as $a) {
-            $e = $eskiler[(string)$a['id']] ?? null;
-            if ($e) {
-                // panelden elle girilen çeviriler ve öne çıkarma korunur
-                $a['aciklama'] = array_merge($e['aciklama'] ?? [], array_filter($a['aciklama'] ?? []));
-                $a['one_cikan'] = !empty($e['one_cikan']);
-                foreach (['one_cikan_etiket', 'one_cikan_ozel'] as $k) { if (array_key_exists($k, $e)) { $a[$k] = $e[$k]; } }
-                foreach (['kasa', 'cekis', 'motor_gucu', 'motor_hacmi', 'yakit', 'vites', 'renk', 'hasar', 'servis_garantisi'] as $k) { if (empty($a[$k]) && isset($e[$k])) { $a[$k] = $e[$k]; } }
-                if (!$a['fotograflar'] && !empty($e['fotograflar'])) { $a['fotograflar'] = $e['fotograflar']; }
+        $kar = aktarim_karsilastir($v['araclar'], $p['araclar']);
+        $k = (array)($_POST['k'] ?? []);
+        $karar = fn(string $id, string $varsayilan) => (string)($k[$id] ?? $varsayilan);
+        $say = ['eklenen' => 0, 'guncellenen' => 0, 'satildi' => 0, 'silinen' => 0, 'atlanan' => 0];
+        $yeniler = [];
+        foreach ($kar['yeni'] as $a) {
+            if ($karar((string)$a['id'], 'atla') === 'ekle') { $yeniler[] = $a; $say['eklenen']++; } else { $say['atlanan']++; }
+        }
+        $guncel = [];
+        foreach ($kar['degisen'] as $d) { if ($karar((string)$d['yeni']['id'], 'atla') === 'guncelle') { $guncel[(string)$d['yeni']['id']] = $d['yeni']; } else { $say['atlanan']++; } }
+        $eksik = [];
+        foreach ($kar['eksik'] as $e) { $eksik[(string)$e['id']] = $karar((string)$e['id'], 'birak'); }
+        $liste = [];
+        foreach ($v['araclar'] as $e) {
+            $id = (string)$e['id'];
+            if (isset($guncel[$id])) { $liste[] = ilan_birlestir($e, $guncel[$id]); $say['guncellenen']++; continue; }
+            if (isset($eksik[$id])) {
+                if ($eksik[$id] === 'sil') { $say['silinen']++; continue; }
+                if ($eksik[$id] === 'satildi') { $e['durum'] = 'satildi'; $say['satildi']++; }
             }
-            $yeni[] = $a;
+            $liste[] = $e;
         }
-        $kalan = 0;
-        if (!empty($_POST['elle_koru'])) {
-            foreach ($v['araclar'] as $a) { if (($a['kaynak'] ?? '') === 'elle' && ($a['durum'] ?? '') !== 'satildi') { $yeni[] = $a; $kalan++; } }
+        $v['araclar'] = array_merge($yeniler, $liste);   // yeni ilanlar listenin başına
+        if ($say['eklenen'] + $say['guncellenen'] + $say['satildi'] + $say['silinen'] === 0) {
+            @unlink($yol); unset($_SESSION['aktarim']);
+            git('index.php', 'Hiçbir değişiklik seçilmedi; site aynı kaldı.');
         }
-        $v['araclar'] = $yeni;
         veri_yaz($v, 'sahibinden dosyası: ' . ($p['dosya'] ?? ''));
         @unlink($yol); unset($_SESSION['aktarim']);
-        git('index.php', 'Araç listesi güncellendi: ' . count($p['araclar']) . ' ilan aktarıldı' . ($kalan ? ", $kalan elle eklenen araç korundu" : '') . '.');
+        $ozet = array_filter(["{$say['eklenen']} eklendi", "{$say['guncellenen']} güncellendi", "{$say['satildi']} satıldı işaretlendi", "{$say['silinen']} silindi", "{$say['atlanan']} atlandı"], fn($x) => $x[0] !== '0');
+        git('index.php', 'Sahibinden aktarımı uygulandı: ' . implode(', ', $ozet) . '.');
     }
 
     if ($s === 'geri_yukle') {
@@ -287,7 +295,7 @@ if ($s === 'aktar') {
         <label>Dosya (XML, XLSX, CSV veya JSON)<input type="file" name="dosya" required accept=".xml,.xlsx,.csv,.json,.txt"></label>
         <button class="y-btn">Önizle</button>
       </form>
-      <p class="y-not">Satılan ve yayından kalkan ilanlar dosyada olmadığı için siteden de kalkar. Panelden elle girdiğiniz çeviriler ve "öne çıkan" seçimi korunur.</p>
+      <p class="y-not">Önizlemede panel, dosyadaki her ilanı sitedekiyle karşılaştırır: yeni ilanları, değişen ilanları (hangi bilginin değiştiğiyle birlikte) ve sahibinden'de artık yayında olmayanları ayrı ayrı gösterir. Her biri için ne yapılacağını siz seçersiniz; onaylamadan sitede hiçbir şey değişmez. Elle girdiğiniz hasar bilgisi, çeviriler ve "öne çıkan" seçimi korunur.</p>
     </section>
     <?php sablon_son(); exit;
 }
@@ -297,28 +305,88 @@ if ($s === 'onizle') {
     $yol = YEDEK . '/' . basename($g);
     if ($g === '' || !is_file($yol)) { git('index.php?s=aktar'); }
     $p = json_decode((string)file_get_contents($yol), true);
-    $mevcut = array_column($v['araclar'], null, 'id');
-    $yeniIdler = array_column($p['araclar'], 'id');
-    $eklenen = count(array_diff($yeniIdler, array_keys($mevcut)));
-    $kalkan = count(array_diff(array_keys($mevcut), $yeniIdler));
+    $kar = aktarim_karsilastir($v['araclar'], $p['araclar']);
+    $foto = fn($a) => !empty($a['fotograflar'][0]) ? '<img src="' . h($a['fotograflar'][0]) . '" alt="" width="72" height="54" referrerpolicy="no-referrer" loading="lazy">' : '';
+    $ad = fn($a) => '<b>' . h(trim(($a['marka'] ?? '') . ' ' . ($a['seri'] ?? ''))) . '</b><br><small>' . h(implode(' · ', array_filter([(string)($a['yil'] ?? ''), (string)($a['model'] ?? '')]))) . ' · ' . alan_goster('fiyat', $a['fiyat'] ?? null) . '</small>';
+    $secim = function (string $id, array $secenekler, string $varsayilan): string {
+        $o = '<div class="y-secim">';
+        foreach ($secenekler as $deger => $yazi) {
+            $o .= '<label><input type="radio" name="k[' . h($id) . ']" value="' . h($deger) . '"' . ($deger === $varsayilan ? ' checked' : '') . '> ' . h($yazi) . '</label>';
+        }
+        return $o . '</div>';
+    };
     sablon_bas('Önizleme'); mesaj(); ?>
-    <h1>Önizleme: <?= h($p['dosya'] ?? '') ?></h1>
-    <section class="y-kart">
-      <p><b><?= count($p['araclar']) ?></b> ilan bulundu · <b><?= $eklenen ?></b> yeni · <b><?= $kalkan ?></b> araç siteden kalkacak.</p>
-      <?php if (!empty($p['kullanilmayan'])): ?><p class="y-not">Kullanılmayan sütunlar: <?= h(implode(', ', array_slice($p['kullanilmayan'], 0, 40))) ?></p><?php endif; ?>
-      <div class="y-tablo-kap"><table class="y-tablo"><thead><tr><th></th><th>Araç</th><th>Yıl</th><th>Km</th><th>Fiyat</th><th>Yakıt / vites</th><th>Foto</th></tr></thead><tbody>
-      <?php foreach (array_slice($p['araclar'], 0, 200) as $a): ?>
-        <tr><td><?php if (!empty($a['fotograflar'][0])): ?><img src="<?= h($a['fotograflar'][0]) ?>" alt="" width="64" height="48" referrerpolicy="no-referrer" loading="lazy"><?php endif; ?></td>
-        <td><b><?= h($a['marka'] . ' ' . $a['seri']) ?></b><br><small><?= h($a['model']) ?> · <?= h(KATEGORILER[$a['kategori']] ?? '') ?></small></td>
-        <td><?= h($a['yil']) ?></td><td><?= $a['km'] !== null ? number_format((int)$a['km'], 0, ',', '.') : '' ?></td>
-        <td><?= $a['fiyat'] ? number_format((int)$a['fiyat'], 0, ',', '.') . ' TL' : '<span class="y-hata-yazi">yok</span>' ?></td>
-        <td><?= h((YAKITLAR[$a['yakit'] ?? ''] ?? '') . ' / ' . (VITESLER[$a['vites'] ?? ''] ?? '')) ?></td><td><?= count($a['fotograflar']) ?></td></tr>
-      <?php endforeach; ?></tbody></table></div>
-      <form method="post" action="index.php?s=uygula"><?= csrf_alan() ?>
-        <label class="y-onay"><input type="checkbox" name="elle_koru" checked> Panelden elle eklediğim araçları koru</label>
-        <button class="y-btn">Onayla ve siteyi güncelle</button> <a href="index.php?s=aktar">Vazgeç</a>
-      </form>
+    <h1>Sahibinden aktarımı: <?= h($p['dosya'] ?? '') ?></h1>
+    <section class="y-kart y-ozet-kutular">
+      <div><b><?= count($kar['yeni']) ?></b><span>yeni ilan</span></div>
+      <div><b><?= count($kar['degisen']) ?></b><span>değişen ilan</span></div>
+      <div><b><?= count($kar['eksik']) ?></b><span>sahibinden'de artık yok</span></div>
+      <div><b><?= count($kar['ayni']) ?></b><span>değişmemiş</span></div>
     </section>
+    <?php if (!empty($p['kullanilmayan'])): ?><p class="y-not">Dosyada kullanılmayan sütunlar: <?= h(implode(', ', array_slice($p['kullanilmayan'], 0, 40))) ?></p><?php endif; ?>
+    <form method="post" action="index.php?s=uygula" class="y-aktarim"><?= csrf_alan() ?>
+
+    <?php if ($kar['yeni']): ?>
+    <section class="y-kart" data-grup>
+      <div class="y-grup-bas"><h2>Yeni ilanlar <small>sahibinden'de var, sitede yok</small></h2>
+        <div class="y-toplu"><button type="button" data-hepsi="ekle">Hepsini ekle</button><button type="button" data-hepsi="atla">Hiçbirini ekleme</button></div></div>
+      <table class="y-tablo"><tbody>
+      <?php foreach ($kar['yeni'] as $a): ?>
+        <tr><td><?= $foto($a) ?></td><td><?= $ad($a) ?><br><small><?= alan_goster('km', $a['km'] ?? null) ?> · <?= h(YAKITLAR[$a['yakit'] ?? ''] ?? '') ?> · <?= count($a['fotograflar'] ?? []) ?> fotoğraf</small></td>
+        <td><?= $secim((string)$a['id'], ['ekle' => 'Siteye ekle', 'atla' => 'Ekleme'], 'ekle') ?></td></tr>
+      <?php endforeach; ?></tbody></table>
+    </section>
+    <?php endif; ?>
+
+    <?php if ($kar['degisen']): ?>
+    <section class="y-kart" data-grup>
+      <div class="y-grup-bas"><h2>Değişen ilanlar <small>sahibinden'de güncellenmiş</small></h2>
+        <div class="y-toplu"><button type="button" data-hepsi="guncelle">Hepsini güncelle</button><button type="button" data-hepsi="atla">Hiçbirini değiştirme</button></div></div>
+      <table class="y-tablo"><tbody>
+      <?php foreach ($kar['degisen'] as $d): $e = $d['eski']; ?>
+        <tr><td><?= $foto($d['yeni']) ?: $foto($e) ?></td>
+        <td><?= $ad($e) ?>
+          <ul class="y-fark">
+          <?php foreach ($d['farklar'] as $alan => [$eski, $yeni]): ?>
+            <?php if ($alan === 'durum'): ?><li><b>Durum:</b> sitede "satıldı", sahibinden'de yeniden yayında → satışa alınacak</li>
+            <?php elseif ($alan === 'aciklama'): ?><li><b>Açıklama değişti</b><?= count(array_diff_key($e['aciklama'] ?? [], ['tr' => 1])) ? ' <small>(elle girilmiş İngilizce/Rusça/Almanca çeviriler artık eski metne ait; güncellenirse silinir)</small>' : '' ?>
+              <details><summary>Eski ve yeni metni göster</summary><div class="y-iki"><div><small>Eski</small><p><?= nl2br(h(mb_substr(alan_goster('aciklama', $eski), 0, 1500))) ?></p></div><div><small>Yeni</small><p><?= nl2br(h(mb_substr(alan_goster('aciklama', $yeni), 0, 1500))) ?></p></div></div></details></li>
+            <?php else: ?><li><b><?= h(KARSILASTIRILAN[$alan] ?? $alan) ?>:</b> <s><?= h(alan_goster($alan, $eski)) ?></s> → <?= h(alan_goster($alan, $yeni)) ?></li><?php endif; ?>
+          <?php endforeach; ?>
+          </ul></td>
+        <td><?= $secim((string)$e['id'], ['guncelle' => 'Güncelle', 'atla' => 'Değiştirme'], 'guncelle') ?></td></tr>
+      <?php endforeach; ?></tbody></table>
+    </section>
+    <?php endif; ?>
+
+    <?php if ($kar['eksik']): ?>
+    <section class="y-kart" data-grup>
+      <div class="y-grup-bas"><h2>Sahibinden'de artık olmayanlar <small>satılmış ya da yayından kaldırılmış olabilir</small></h2>
+        <div class="y-toplu"><button type="button" data-hepsi="satildi">Hepsi satıldı</button><button type="button" data-hepsi="birak">Hepsini bırak</button></div></div>
+      <table class="y-tablo"><tbody>
+      <?php foreach ($kar['eksik'] as $e): $elle = ($e['kaynak'] ?? '') === 'elle'; ?>
+        <tr><td><?= $foto($e) ?></td><td><?= $ad($e) ?><?= $elle ? '<br><span class="y-rozet">panelden elle eklendi</span>' : '' ?></td>
+        <td><?= $secim((string)$e['id'], ['satildi' => 'Satıldı işaretle (siteden gizle)', 'sil' => 'Tamamen sil', 'birak' => 'Sitede bırak'], $elle ? 'birak' : 'satildi') ?></td></tr>
+      <?php endforeach; ?></tbody></table>
+      <p class="y-not">"Satıldı" işaretlenen araç sitede görünmez ama panelde kalır; istediğiniz zaman "Satışa al" ile geri getirebilirsiniz.</p>
+    </section>
+    <?php endif; ?>
+
+    <?php if ($kar['ayni']): ?><p class="y-not"><?= count($kar['ayni']) ?> ilan sitedekiyle aynı; bunlara dokunulmayacak.</p><?php endif; ?>
+
+    <?php if ($kar['yeni'] || $kar['degisen'] || $kar['eksik']): ?>
+      <div class="y-alt-cubuk"><button class="y-btn">Seçimleri uygula</button> <a href="index.php?s=aktar">Vazgeç</a> <small>Uygulamadan önce otomatik yedek alınır.</small></div>
+    <?php else: ?>
+      <section class="y-kart"><p><b>Her şey güncel.</b> Dosyadaki ilanlar sitedekilerle aynı, yapılacak bir değişiklik yok.</p><a href="index.php">Araç listesine dön</a></section>
+    <?php endif; ?>
+    </form>
+    <script>
+      document.querySelectorAll('[data-hepsi]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          b.closest('[data-grup]').querySelectorAll('input[type=radio][value="' + b.dataset.hepsi + '"]').forEach(function (r) { r.checked = true; });
+        });
+      });
+    </script>
     <?php sablon_son(); exit;
 }
 
