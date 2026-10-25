@@ -80,7 +80,14 @@ if ($post) {
         $k['markalar'][$mi]['modeller'][] = ['ad' => $ad, 'motorlar' => []];
         katalog_yaz($k); git(adres($mAd, $ad), "$ad eklendi. Şimdi motor satırı ekleyin (motoru olmayan model formda görünmez).");
     }
-    if ($mdi === null && in_array($s, ['model_adlandir', 'model_sil', 'motor_kaydet', 'motor_sil', 'kontrol_kaldir'], true)) { git(adres($mAd), 'Model bulunamadı.', true); }
+    if ($mdi === null && in_array($s, ['model_yillar', 'model_adlandir', 'model_sil', 'motor_kaydet', 'motor_sil', 'kontrol_kaldir'], true)) { git(adres($mAd), 'Model bulunamadı.', true); }
+    if ($s === 'model_yillar') {   // motor satırından bağımsız, modelin formda listelendiği yıllar
+        $bas = sayi_temizle($_POST['bas'] ?? ''); $son = sayi_temizle($_POST['son'] ?? ''); $ust = (int)date('Y') + 1;
+        if ($bas === null) { unset($k['markalar'][$mi]['modeller'][$mdi]['yillar']); katalog_yaz($k); git(adres($mAd, $mdAd), 'Model yılları kaldırıldı; model yalnızca motor satırlarının yıllarında listelenir.'); }
+        if ($bas < 1950 || $bas > $ust || ($son !== null && ($son < $bas || $son > $ust))) { git(adres($mAd, $mdAd), 'Yıl aralığı geçersiz.', true); }
+        $k['markalar'][$mi]['modeller'][$mdi]['yillar'] = [$bas, $son];
+        katalog_yaz($k); git(adres($mAd, $mdAd), 'Model yılları kaydedildi.');
+    }
     if ($s === 'model_adlandir') {
         $ad = ad_temiz($_POST['ad'] ?? '');
         if ($ad === '') { git(adres($mAd, $mdAd), 'Model adı boş olamaz.', true); }
@@ -139,9 +146,11 @@ $say = function (array $m): array {
     return [count($m['modeller']), $mot, $kon];
 };
 $model_yillari = function (array $md): string {
-    if (!$md['motorlar']) { return '—'; }
-    $b = min(array_map(fn($x) => $x['yil'][0], $md['motorlar']));
-    $son = array_map(fn($x) => $x['yil'][1], $md['motorlar']);
+    $araliklar = array_map(fn($x) => $x['yil'], $md['motorlar']);
+    if (!empty($md['yillar'])) { $araliklar[] = $md['yillar']; }
+    if (!$araliklar) { return '—'; }
+    $b = min(array_map(fn($y) => $y[0], $araliklar));
+    $son = array_map(fn($y) => $y[1], $araliklar);
     return $b . ' – ' . (in_array(null, $son, true) ? 'bugün' : max($son));
 };
 $silme_formu = function (string $islem, string $metin, array $gizli) {
@@ -199,7 +208,7 @@ if ($mdi !== null):
           <?php if (!empty($x['kontrol'])): ?><form method="post" action="katalog.php?s=kontrol_kaldir"><?= csrf_alan() . $gizli ?><input type="hidden" name="n" value="<?= $n ?>"><button>Doğru</button></form><?php endif; ?>
           <form method="post" action="katalog.php?s=motor_sil" onsubmit="return confirm('Bu motor satırı silinsin mi?')"><?= csrf_alan() . $gizli ?><input type="hidden" name="n" value="<?= $n ?>"><button>Sil</button></form></td></tr>
     <?php endforeach; ?>
-    <?php if (!$md['motorlar']): ?><tr><td colspan="6" class="y-not">Motor satırı yok. Bu model formda görünmez; aşağıdan ekleyin.</td></tr><?php endif; ?>
+    <?php if (!$md['motorlar']): ?><tr><td colspan="6" class="y-not">Motor satırı yok. <?= empty($md['yillar']) ? 'Bu model formda görünmez; aşağıdan ekleyin.' : 'Formda model yıllarında listelenir; şanzıman, yakıt ve motor genel listelerden seçilir. Motor satırı eklerseniz yalnızca gerçek seçenekler çıkar.' ?></td></tr><?php endif; ?>
   </table></div></section>
 
   <section class="y-kart" id="motor-form"><h2><?= $dz !== null ? 'Motor satırını düzenle' : 'Motor satırı ekle' ?></h2>
@@ -220,6 +229,11 @@ if ($mdi !== null):
   </section>
 
   <section class="y-kart"><h2>Model</h2>
+    <form method="post" action="katalog.php?s=model_yillar" class="y-satir"><?= csrf_alan() . $gizli ?>
+      <label>Model yılları: ilk yıl (boş = kullanılmaz)<input name="bas" inputmode="numeric" maxlength="4" value="<?= h($md['yillar'][0] ?? '') ?>"></label>
+      <label>son yıl (hâlâ satılıyorsa boş)<input name="son" inputmode="numeric" maxlength="4" value="<?= h($md['yillar'][1] ?? '') ?>"></label>
+      <button class="y-btn y-btn-cizgi">Yılları kaydet</button></form>
+    <p class="y-not">Model yılları, motor satırı o yılı kapsamasa da modelin formda listelenmesini sağlar (o yıllarda modelin tüm motorları gösterilir). Örnek siteden gelen yıl aralıkları burada tutulur.</p>
     <form method="post" action="katalog.php?s=model_adlandir" class="y-satir"><?= csrf_alan() . $gizli ?><label>Model adı<input name="ad" required maxlength="60" value="<?= h($md['ad']) ?>"></label><button class="y-btn y-btn-cizgi">Adı değiştir</button></form>
     <?php $silme_formu('model_sil', 'Bu modeli sil', ['marka' => $m['ad'], 'model' => $md['ad']]); ?>
   </section>

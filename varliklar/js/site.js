@@ -610,6 +610,12 @@
     var buYil = new Date().getFullYear();
     return Array.isArray(x.yil) && x.yil[0] <= y && (x.yil[1] == null ? buYil + 1 : x.yil[1]) >= y;
   }
+  /* model düzeyindeki yıl aralığı (md.yillar): motor satırı o yılı kapsamasa da model listelenir */
+  function modelYilda(md, y) {
+    var buYil = new Date().getFullYear();
+    return !!md && Array.isArray(md.yillar) && md.yillar[0] <= y && (md.yillar[1] == null ? buYil + 1 : md.yillar[1]) >= y;
+  }
+  function modelVar(md, y) { return (md.motorlar || []).some(function (x) { return x && motorYilda(x, y); }) || modelYilda(md, y); }
   function tekil(dizi) { return dizi.filter(function (v, i) { return dizi.indexOf(v) === i; }); }
   function rakam(s) { return String(s || "").replace(/\D/g, ""); }
   function noUret() {
@@ -633,7 +639,10 @@
     function model() { var m = marka(), y = yilDeger(); return m && y && S.model.value && S.model.value !== ELLE ? (m.modeller[Number(S.model.value)] || null) : null; }
     function motorlar() {
       var md = model(), y = yilDeger();
-      return md ? (md.motorlar || []).filter(function (x) { return x && motorYilda(x, y); }) : null;
+      if (!md) { return null; }
+      var l = (md.motorlar || []).filter(function (x) { return x && motorYilda(x, y); });
+      if (!l.length) { l = (md.motorlar || []).filter(Boolean); }   // yalnız model yılıyla listelenen yıl: modelin tüm motorları
+      return l.length ? l : null;                                     // motor bilgisi yok: genel listeler
     }
     function filtreli(vitesDahil, yakitDahil) {
       var l = motorlar();
@@ -647,7 +656,7 @@
     }
     function motorEtiket(x) {
       if (!x.hacim) { return x.ad; }   // elektrikli: motor hacmi yok
-      return x.ad.indexOf(x.hacim) === 0 ? x.ad : x.hacim + " " + x.ad;
+      return (x.ad.indexOf(x.hacim) > -1 || /^\d\.\d/.test(x.ad)) ? x.ad : x.hacim + " " + x.ad;   // "4.0 V6 / 4.6 V8" olduğu gibi
     }
 
     /* ---- bir listenin seçeneklerini hesapla: [[değer, yazı], ...]; null = üst seçim yok */
@@ -663,6 +672,7 @@
         var yillar = [];
         if (m) {
           m.modeller.forEach(function (md) {
+            if (Array.isArray(md.yillar)) { for (var z = md.yillar[0]; z <= Math.min(md.yillar[1] == null ? buYil : md.yillar[1], buYil); z++) { yillar.push(z); } }
             (md.motorlar || []).forEach(function (x) {
               if (!Array.isArray(x.yil)) { return; }
               for (var y = x.yil[0]; y <= Math.min(x.yil[1] == null ? buYil : x.yil[1], buYil); y++) { yillar.push(y); }
@@ -677,7 +687,7 @@
         if (!m) { return []; }
         var y = yilDeger();
         return m.modeller.map(function (md, i) { return [String(i), md.ad, md]; })
-          .filter(function (r) { return (r[2].motorlar || []).some(function (x) { return x && motorYilda(x, y); }); })
+          .filter(function (r) { return modelVar(r[2], y); })
           .map(function (r) { return [r[0], r[1]]; });
       }
       if (alan === "vites") {
@@ -690,7 +700,9 @@
         if (!S.vites.value) { return null; }
         l = filtreli(true, false);
         var yk = l ? tekil(l.map(function (x) { return x.yakit; })) : GENEL.yakit.slice();
-        if (yk.indexOf("benzin") > -1 && yk.indexOf("lpg") < 0) { yk.push("lpg"); }   // sonradan LPG taktırılan benzinliler
+        /* sonradan LPG taktırılan benzinliler (3.5 litreye kadar; süper spor / büyük V8–V12 motorlarda gösterilmez) */
+        var lpgUygun = l ? l.some(function (x) { return x.yakit === "benzin" && parseFloat(x.hacim) <= 3.5; }) : true;
+        if (yk.indexOf("benzin") > -1 && yk.indexOf("lpg") < 0 && lpgUygun) { yk.push("lpg"); }
         return GENEL.yakit.filter(function (k) { return yk.indexOf(k) > -1; }).map(function (k) { return [k, t("arac.yakit_" + k)]; });
       }
       if (alan === "motor") {
