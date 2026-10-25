@@ -592,32 +592,30 @@
      başarısız olsa da mesaj yine açılır. */
   var ELLE = "__elle";
   var GENEL = {
+    kasa: ["hatchback", "sedan", "station", "suv", "crossover", "coupe", "cabrio", "roadster", "mpv", "minivan", "pickup", "panelvan", "kombi", "kombivan", "kamyonet", "minibus"],
     vites: ["manuel", "otomatik", "yari_otomatik"],
     yakit: ["benzin", "dizel", "lpg", "hibrit", "elektrik"],
     hacim: ["0.8", "0.9", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "2.0", "2.1", "2.2", "2.3", "2.4", "2.5",
       "2.7", "2.8", "2.9", "3.0", "3.2", "3.5", "4.0", "4.4", "5.0"]
   };
-  var ZINCIR = ["marka", "yil", "model", "vites", "yakit", "motor"];
+  /* Aşama 38: sıra Marka → Yıl → Model → Versiyon → Kasa → Şanzıman → Yakıt → Motor hacmi */
+  var ZINCIR = ["marka", "yil", "model", "versiyon", "kasa", "vites", "yakit", "motor"];
   var PARCALAR = ["kaput", "tavan", "bagaj", "on_tampon", "arka_tampon", "sol_on_camurluk", "sag_on_camurluk", "sol_on_kapi", "sag_on_kapi",
     "sol_arka_kapi", "sag_arka_kapi", "sol_arka_camurluk", "sag_arka_camurluk"];
 
+  /* katalog dizini (veri/katalog/index.json): marka → model → yıl aralıkları; versiyonlar marka dosyasında (veri/katalog/<d>.json) */
   function katalogGecerli(k) {
     return k && Array.isArray(k.markalar) && k.markalar.length > 0 && k.markalar.every(function (m) {
       return m && typeof m.ad === "string" && Array.isArray(m.modeller);
     });
   }
-  function motorYilda(x, y) {
+  function aralikta(r, y) {
     var buYil = new Date().getFullYear();
-    return Array.isArray(x.yil) && x.yil[0] <= y && (x.yil[1] == null ? buYil + 1 : x.yil[1]) >= y;
+    return Array.isArray(r) && r[0] <= y && (r[1] == null ? buYil + 1 : r[1]) >= y;
   }
-  /* model düzeyindeki yıl aralığı (md.yillar): motor satırı o yılı kapsamasa da model listelenir */
-  function modelYilda(md, y) {
-    var buYil = new Date().getFullYear();
-    return !!md && Array.isArray(md.yillar) && md.yillar[0] <= y && (md.yillar[1] == null ? buYil + 1 : md.yillar[1]) >= y;
-  }
-  function modelVar(md, y) { return (md.motorlar || []).some(function (x) { return x && motorYilda(x, y); }) || modelYilda(md, y); }
   function tekil(dizi) { return dizi.filter(function (v, i) { return dizi.indexOf(v) === i; }); }
   function rakam(s) { return String(s || "").replace(/\D/g, ""); }
+  function kasaYazi(k) { var s = T["arac.kasa_" + k]; return s == null ? k : s; }
   function noUret() {
     var d = new Date(), harf = "ABCDEFGHJKLMNPRSTUVYZ23456789", s = "";
     for (var i = 0; i < 4; i++) { s += harf.charAt(Math.floor(Math.random() * harf.length)); }
@@ -627,7 +625,8 @@
   function teklifFormu() {
     var form = $("[data-teklif-form]");
     if (!form) { return; }
-    var KATALOG = null, adim = 1, TOPLAM = 5, gonderildi = false;
+    var KATALOG = null, MARKA_VERI = {}, adim = 1, TOPLAM = 5, gonderildi = false;
+    var klasor = (form.dataset.katalog || "").replace(/[^\/]*$/, "");
     var durumYazi = $("[data-katalog-durum]", form), hataYazi = $("[data-form-hata]", form);
     var S = {}, E = {};
     ZINCIR.forEach(function (a) { S[a] = form.elements[a]; E[a] = form.elements[a + "_elle"]; });
@@ -637,27 +636,35 @@
     function marka() { return KATALOG && S.marka.value && S.marka.value !== ELLE ? KATALOG.markalar[Number(S.marka.value)] : null; }
     function yilDeger() { var v = S.yil.value === ELLE ? E.yil.value : S.yil.value; return yilGecerli(v) ? Number(v) : null; }
     function model() { var m = marka(), y = yilDeger(); return m && y && S.model.value && S.model.value !== ELLE ? (m.modeller[Number(S.model.value)] || null) : null; }
-    function motorlar() {
-      var md = model(), y = yilDeger();
-      if (!md) { return null; }
-      var l = (md.motorlar || []).filter(function (x) { return x && motorYilda(x, y); });
-      if (!l.length) { l = (md.motorlar || []).filter(Boolean); }   // yalnız model yılıyla listelenen yıl: modelin tüm motorları
-      return l.length ? l : null;                                     // motor bilgisi yok: genel listeler
+    function markaVeri() { var m = marka(); return m ? MARKA_VERI[m.d] : null; }   // undefined: yükleniyor, false: yüklenemedi
+    /* seçili modelin o yıl geçerli versiyon satırları; null = bilgi yok (genel listeler) */
+    function satirlar() {
+      var md = model(), mv = markaVeri(), y = yilDeger();
+      if (!md || !mv || !mv.modeller) { return null; }
+      var veri = mv.modeller[Number(S.model.value)];
+      if (!veri || veri.ad !== md.ad) { veri = mv.modeller.filter(function (x) { return x.ad === md.ad; })[0]; }
+      if (!veri) { return null; }
+      var l = (veri.motorlar || []).filter(function (x) { return x && aralikta(x.yil, y); });
+      if (!l.length) { l = (veri.motorlar || []).filter(Boolean); }   // yalnız model yılıyla listelenen yıl: modelin tüm versiyonları
+      return l.length ? l : null;
     }
-    function filtreli(vitesDahil, yakitDahil) {
-      var l = motorlar();
-      if (!l) { return null; }
-      if (vitesDahil && S.vites.value && S.vites.value !== ELLE) { l = l.filter(function (x) { return x.vites === S.vites.value; }); }
-      if (yakitDahil && S.yakit.value && S.yakit.value !== ELLE) {
-        var yk = S.yakit.value;
-        l = l.filter(function (x) { return yk === "lpg" ? (x.yakit === "benzin" || x.yakit === "lpg") : x.yakit === yk; });
+    /* "alan" seviyesine kadar (o hariç) yapılan seçimlere uyan satırlar */
+    function suzulmus(alan) {
+      var l = satirlar(); if (!l) { return null; }
+      var sira = ["versiyon", "kasa", "vites", "yakit"], son = sira.indexOf(alan);
+      for (var i = 0; i < (son < 0 ? sira.length : son); i++) {
+        var a = sira[i], v = S[a].value;
+        if (!v || v === ELLE) { if (a === "versiyon" && v === ELLE) { continue; } continue; }
+        l = l.filter(function (x) {
+          if (a === "versiyon") { return x.ad === v; }
+          if (a === "kasa") { return !x.kasa || x.kasa === v; }
+          if (a === "yakit") { return v === "lpg" ? (x.yakit === "benzin" || x.yakit === "lpg") : x.yakit === v; }
+          return x[a] === v;
+        });
       }
       return l;
     }
-    function motorEtiket(x) {
-      if (!x.hacim) { return x.ad; }   // elektrikli: motor hacmi yok
-      return (x.ad.indexOf(x.hacim) > -1 || /^\d\.\d/.test(x.ad)) ? x.ad : x.hacim + " " + x.ad;   // "4.0 V6 / 4.6 V8" olduğu gibi
-    }
+    function hacimYazi(x) { return x.hacim ? x.hacim : (x.yakit === "elektrik" ? t("sayfalar.teklif_elektrik") : ""); }
 
     /* ---- bir listenin seçeneklerini hesapla: [[değer, yazı], ...]; null = üst seçim yok */
     function secenekler(alan) {
@@ -672,11 +679,7 @@
         var yillar = [];
         if (m) {
           m.modeller.forEach(function (md) {
-            if (Array.isArray(md.yillar)) { for (var z = md.yillar[0]; z <= Math.min(md.yillar[1] == null ? buYil : md.yillar[1], buYil); z++) { yillar.push(z); } }
-            (md.motorlar || []).forEach(function (x) {
-              if (!Array.isArray(x.yil)) { return; }
-              for (var y = x.yil[0]; y <= Math.min(x.yil[1] == null ? buYil : x.yil[1], buYil); y++) { yillar.push(y); }
-            });
+            (md.y || []).forEach(function (r) { for (var z = r[0]; z <= Math.min(r[1] == null ? buYil : r[1], buYil); z++) { yillar.push(z); } });
           });
         } else { for (var g = buYil; g >= 1980; g--) { yillar.push(g); } }
         return tekil(yillar).sort(function (a, b) { return b - a; }).map(function (y) { return [String(y), String(y)]; });
@@ -687,35 +690,48 @@
         if (!m) { return []; }
         var y = yilDeger();
         return m.modeller.map(function (md, i) { return [String(i), md.ad, md]; })
-          .filter(function (r) { return modelVar(r[2], y); })
+          .filter(function (r) { return (r[2].y || []).some(function (a) { return aralikta(a, y); }); })
           .map(function (r) { return [r[0], r[1]]; });
       }
-      if (alan === "vites") {
+      if (alan === "versiyon") {
         if (!S.model.value) { return null; }
-        l = filtreli(false, false);
-        var v = l ? tekil(l.map(function (x) { return x.vites; })) : GENEL.vites;
+        if (model() && markaVeri() === undefined) { return "yukleniyor"; }
+        l = satirlar();
+        if (!l) { return []; }
+        return tekil(l.map(function (x) { return x.ad; })).sort(function (a, b) { return a.localeCompare(b, "tr", { numeric: true }); })
+          .map(function (v) { return [v, v]; });
+      }
+      if (alan === "kasa") {
+        if (!S.versiyon.value) { return null; }
+        l = suzulmus("kasa");
+        var k = l ? tekil(l.map(function (x) { return x.kasa; }).filter(Boolean)) : [];
+        if (!k.length) { k = GENEL.kasa.slice(); }
+        return k.map(function (x) { return [x, kasaYazi(x)]; }).sort(function (a, b) { return GENEL.kasa.indexOf(a[0]) - GENEL.kasa.indexOf(b[0]); });
+      }
+      if (alan === "vites") {
+        if (!S.kasa.value) { return null; }
+        l = suzulmus("vites");
+        var v = l && l.length ? tekil(l.map(function (x) { return x.vites; })) : GENEL.vites;
         return GENEL.vites.filter(function (k) { return v.indexOf(k) > -1; }).map(function (k) { return [k, t("arac.vites_" + k)]; });
       }
       if (alan === "yakit") {
         if (!S.vites.value) { return null; }
-        l = filtreli(true, false);
-        var yk = l ? tekil(l.map(function (x) { return x.yakit; })) : GENEL.yakit.slice();
+        l = suzulmus("yakit");
+        var yk = l && l.length ? tekil(l.map(function (x) { return x.yakit; })) : GENEL.yakit.slice();
         /* sonradan LPG taktırılan benzinliler (3.5 litreye kadar; süper spor / büyük V8–V12 motorlarda gösterilmez) */
-        var lpgUygun = l ? l.some(function (x) { return x.yakit === "benzin" && parseFloat(x.hacim) <= 3.5; }) : true;
+        var lpgUygun = l && l.length ? l.some(function (x) { return x.yakit === "benzin" && (!x.hacim || parseFloat(x.hacim) <= 3.5); }) : true;
         if (yk.indexOf("benzin") > -1 && yk.indexOf("lpg") < 0 && lpgUygun) { yk.push("lpg"); }
         return GENEL.yakit.filter(function (k) { return yk.indexOf(k) > -1; }).map(function (k) { return [k, t("arac.yakit_" + k)]; });
       }
       if (alan === "motor") {
         if (!S.yakit.value) { return null; }
-        l = filtreli(true, true);
-        if (l) {
-          var gorulen = {};
-          return l.filter(function (x) { var k = motorEtiket(x); if (gorulen[k]) { return false; } gorulen[k] = 1; return true; })
-            .sort(function (a, b) { return (parseFloat(a.hacim) || 0) - (parseFloat(b.hacim) || 0) || a.ad.localeCompare(b.ad); })
-            .map(function (x) { return [motorEtiket(x), motorEtiket(x)]; });
+        l = suzulmus("motor");
+        if (l && l.length) {
+          var h = tekil(l.map(hacimYazi).filter(Boolean)).sort(function (a, b) { return (parseFloat(a) || 0) - (parseFloat(b) || 0); });
+          if (h.length) { return h.map(function (x) { return [x, x]; }); }
         }
         if (S.yakit.value === "elektrik") { return [[t("sayfalar.teklif_elektrik"), t("sayfalar.teklif_elektrik")]]; }
-        return GENEL.hacim.map(function (h) { return [h, h]; });
+        return GENEL.hacim.map(function (x) { return [x, x]; });
       }
       return [];
     }
@@ -726,8 +742,8 @@
       try { l = secenekler(alan); } catch (e) { l = []; }
       while (s.options.length) { s.remove(0); }
       var onceki = ZINCIR[ZINCIR.indexOf(alan) - 1];
-      if (l === null) {
-        secenekEkle(s, "", t("sayfalar.teklif_once", { alan: alanAdi(onceki) }));
+      if (l === null || l === "yukleniyor") {
+        secenekEkle(s, "", l === null ? t("sayfalar.teklif_once", { alan: alanAdi(onceki) }) : t("sayfalar.teklif_yukleniyor"));
         s.disabled = true; E[alan].hidden = true; E[alan].value = "";
         return;
       }
@@ -749,11 +765,24 @@
       var lpg = $("[data-lpg-not]", form);
       if (lpg) { lpg.hidden = !Array.prototype.some.call(S.yakit.options, function (o) { return o.value === "lpg"; }); }
     }
+    /* marka seçilince o markanın versiyon dosyası yüklenir (bir kez); yüklenemezse genel listelerle devam */
+    function markaYukle() {
+      var m = marka();
+      if (!m || MARKA_VERI[m.d] !== undefined || !window.fetch) { if (m && !window.fetch) { MARKA_VERI[m.d] = false; } return; }
+      var d = m.d;
+      var iptal = window.AbortController ? new AbortController() : null, sure = setTimeout(function () { if (iptal) { iptal.abort(); } }, 20000);
+      fetch(klasor + d + ".json?v=" + encodeURIComponent(KATALOG.guncelleme || ""), { signal: iptal ? iptal.signal : undefined })
+        .then(function (r) { if (!r.ok) { throw new Error(r.status); } return r.json(); })
+        .then(function (v) { clearTimeout(sure); MARKA_VERI[d] = v && Array.isArray(v.modeller) ? v : false; })
+        .catch(function () { clearTimeout(sure); MARKA_VERI[d] = false; })
+        .then(function () { try { var mm = marka(); if (mm && mm.d === d) { zincirle("versiyon"); } } catch (e) { /* elle devam */ } });
+    }
     ZINCIR.forEach(function (alan, i) {
       S[alan].addEventListener("change", function () {
         try {
           E[alan].hidden = S[alan].value !== ELLE;
           if (S[alan].value === ELLE) { E[alan].focus(); }
+          if (alan === "marka") { markaYukle(); }
           if (ZINCIR[i + 1]) { zincirle(ZINCIR[i + 1]); }
         } catch (e) { elleMod(); }
       });
@@ -793,7 +822,7 @@
       if (!mk || !KATALOG) { return; }
       var i = KATALOG.markalar.map(function (m) { return m.ad.toLowerCase(); }).indexOf(mk.toLowerCase());
       if (i < 0) { return; }
-      S.marka.value = String(i); zincirle("yil");
+      S.marka.value = String(i); markaYukle(); zincirle("yil");
       if (p.get("yil") && Array.prototype.some.call(S.yil.options, function (o) { return o.value === p.get("yil"); })) { S.yil.value = p.get("yil"); zincirle("model"); }
     }
 
@@ -823,7 +852,7 @@
     function secimAnahtar(alan) {
       var s = S[alan];
       if (s.value === ELLE) { return E[alan].value.trim(); }
-      if (alan === "vites" || alan === "yakit") { return s.value; }
+      if (alan === "vites" || alan === "yakit" || alan === "kasa") { return s.value; }
       return secimYazi(alan);
     }
     function radyoYazi(ad) {
@@ -886,7 +915,7 @@
       return [
         [1, [
           [alanAdi("marka"), secimYazi("marka")], [alanAdi("yil"), secimYazi("yil")], [alanAdi("model"), secimYazi("model")],
-          [t("sayfalar.teklif_donanim"), deger("donanim")], [alanAdi("vites"), secimYazi("vites")],
+          [alanAdi("versiyon"), secimYazi("versiyon")], [alanAdi("kasa"), secimYazi("kasa")], [alanAdi("vites"), secimYazi("vites")],
           [alanAdi("yakit"), secimYazi("yakit")], [alanAdi("motor"), secimYazi("motor")]]],
         [2, [
           [t("sayfalar.sat_istek"), radyoYazi("istek")], [t("arac.km"), deger("km")], [t("sayfalar.sat_renk"), deger("renk")],
@@ -924,7 +953,7 @@
       PARCALAR.forEach(function (p) { var s = form.elements["parca_" + p]; if (s) { parcalar[p] = s.value; } });
       var v = {
         no: no, dil: DIL, istek: deger("istek"),
-        marka: secimAnahtar("marka"), yil: secimAnahtar("yil"), model: secimAnahtar("model"), donanim: deger("donanim"),
+        marka: secimAnahtar("marka"), yil: secimAnahtar("yil"), model: secimAnahtar("model"), versiyon: secimAnahtar("versiyon"), kasa: secimAnahtar("kasa"),
         vites: secimAnahtar("vites"), yakit: secimAnahtar("yakit"), motor: secimAnahtar("motor"),
         elle: ZINCIR.filter(function (a) { return S[a].value === ELLE; }),
         km: rakam(deger("km")), renk: deger("renk"), beklenti: rakam(deger("beklenti")),
@@ -1023,7 +1052,7 @@
 
     git(1);
     /* test ve hata ayıklama için (konsoldan): window.__teklif.mesaj() */
-    window.__teklif = { mesaj: function () { return mesajSatirlari("TEST").join("\n"); }, katalog: function () { return KATALOG; } };
+    window.__teklif = { mesaj: function () { return mesajSatirlari("TEST").join("\n"); }, katalog: function () { return KATALOG; }, marka: function () { return markaVeri(); } };
   }
 
   /* ---------- ölçülü animasyonlar: bölümler ve kartlar ekrana girerken yumuşakça belirir.

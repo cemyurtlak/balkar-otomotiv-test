@@ -15,6 +15,7 @@ const T_PARCA = ['kaput' => 'Kaput', 'tavan' => 'Tavan', 'bagaj' => 'Bagaj kapa�
     'sol_on_camurluk' => 'Sol ön çamurluk', 'sag_on_camurluk' => 'Sağ ön çamurluk', 'sol_on_kapi' => 'Sol ön kapı', 'sag_on_kapi' => 'Sağ ön kapı',
     'sol_arka_kapi' => 'Sol arka kapı', 'sag_arka_kapi' => 'Sağ arka kapı', 'sol_arka_camurluk' => 'Sol arka çamurluk', 'sag_arka_camurluk' => 'Sağ arka çamurluk'];
 const T_PARCA_DURUM = ['orijinal' => 'Orijinal', 'lokal' => 'Lokal boyalı', 'boyali' => 'Boyalı', 'degisen' => 'Değişen'];
+const T_KASA = ['hatchback' => 'Hatchback', 'sedan' => 'Sedan', 'station' => 'Station Wagon', 'suv' => 'SUV', 'crossover' => 'Crossover', 'coupe' => 'Coupe', 'cabrio' => 'Cabrio', 'roadster' => 'Roadster', 'mpv' => 'MPV', 'minivan' => 'Minivan', 'pickup' => 'Pick-Up', 'panelvan' => 'Panelvan', 'kombi' => 'Kombi', 'kombivan' => 'Kombivan', 'kamyonet' => 'Kamyonet', 'minibus' => 'Minibüs'];
 const T_DIL = ['tr' => 'Türkçe', 'en' => 'İngilizce', 'ru' => 'Rusça', 'de' => 'Almanca'];
 
 function teklif_dosya(string $no): ?string {
@@ -94,6 +95,8 @@ if (isset($_GET['no'])) {
         <dt>Marka</dt><dd><?= h($a['marka'] ?? '') . $isaret('marka') ?></dd>
         <dt>Yıl</dt><dd><?= h($a['yil'] ?? '') . $isaret('yil') ?></dd>
         <dt>Model</dt><dd><?= h($a['model'] ?? '') . $isaret('model') ?></dd>
+        <?php if (!empty($a['versiyon'])): ?><dt>Versiyon</dt><dd><?= h($a['versiyon']) . $isaret('versiyon') ?></dd><?php endif; ?>
+        <?php if (!empty($a['kasa'])): ?><dt>Kasa tipi</dt><dd><?= h(T_KASA[$a['kasa']] ?? $a['kasa']) . $isaret('kasa') ?></dd><?php endif; ?>
         <?php if (!empty($a['donanim'])): ?><dt>Donanım</dt><dd><?= h($a['donanim']) ?></dd><?php endif; ?>
         <dt>Şanzıman</dt><dd><?= h(vites_y((string)($a['vites'] ?? ''))) . $isaret('vites') ?></dd>
         <dt>Yakıt</dt><dd><?= h(yakit_y((string)($a['yakit'] ?? ''))) . $isaret('yakit') ?></dd>
@@ -149,7 +152,7 @@ sablon_bas('Teklifler'); mesaj(); ?>
     <tr><th>Tarih</th><th>Araç</th><th>Km</th><th>İstek</th><th>Müşteri</th><th>Durum</th></tr>
     <?php foreach ($liste as $v): $a = $v['arac'] ?? []; $k = $v['kisi'] ?? []; ?>
       <tr<?= $v['durum'] === 'yeni' ? ' class="y-yeni"' : '' ?>><td><?= h(date('d.m.Y H:i', strtotime($v['tarih']))) ?><br><small><?= h($v['no']) ?></small></td>
-        <td><a href="teklifler.php?no=<?= h(rawurlencode($v['no'])) ?>"><?= h(arac_yazi($a)) ?></a><br><small><?= h(implode(' · ', array_filter([$a['motor'] ?? '', yakit_y((string)($a['yakit'] ?? '')), vites_y((string)($a['vites'] ?? ''))]))) ?></small></td>
+        <td><a href="teklifler.php?no=<?= h(rawurlencode($v['no'])) ?>"><?= h(arac_yazi($a)) ?></a><br><small><?= h(implode(' · ', array_filter([$a['versiyon'] ?? '', $a['motor'] ?? '', yakit_y((string)($a['yakit'] ?? '')), vites_y((string)($a['vites'] ?? ''))]))) ?></small></td>
         <td><?= ($a['km'] ?? '') !== '' ? number_format((int)$a['km'], 0, ',', '.') : '—' ?></td>
         <td><?= h(T_ISTEK[$v['istek']] ?? $v['istek']) ?></td>
         <td><?= h($k['ad'] ?? '') ?><br><a href="tel:<?= h(preg_replace('/[^\d+]/', '', (string)($k['tel'] ?? ''))) ?>"><?= h($k['tel'] ?? '') ?></a></td>

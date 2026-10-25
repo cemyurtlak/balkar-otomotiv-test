@@ -52,9 +52,10 @@ $kayit = [
     'dil' => secim($g['dil'] ?? 'tr', ['tr', 'en', 'ru', 'de'], 'tr'),
     'istek' => secim($g['istek'] ?? '', ['sat', 'takas', 'fiyat'], 'sat'),
     'arac' => [
-        'marka' => $marka, 'yil' => rakam_y($g['yil'] ?? '', 4), 'model' => $model, 'donanim' => yazi($g['donanim'] ?? '', 60),
+        'marka' => $marka, 'yil' => rakam_y($g['yil'] ?? '', 4), 'model' => $model, 'versiyon' => yazi($g['versiyon'] ?? '', 90),
+        'kasa' => yazi($g['kasa'] ?? '', 40), 'donanim' => yazi($g['donanim'] ?? '', 60),
         'vites' => yazi($g['vites'] ?? '', 40), 'yakit' => yazi($g['yakit'] ?? '', 40), 'motor' => yazi($g['motor'] ?? '', 80),
-        'elle' => array_values(array_intersect(['marka', 'yil', 'model', 'vites', 'yakit', 'motor'], (array)($g['elle'] ?? []))),
+        'elle' => array_values(array_intersect(['marka', 'yil', 'model', 'versiyon', 'kasa', 'vites', 'yakit', 'motor'], (array)($g['elle'] ?? []))),
         'km' => rakam_y($g['km'] ?? '', 9), 'renk' => yazi($g['renk'] ?? '', 30), 'beklenti' => rakam_y($g['beklenti'] ?? '', 12),
     ],
     'ekspertiz' => [

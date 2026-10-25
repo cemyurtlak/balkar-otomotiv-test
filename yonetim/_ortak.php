@@ -148,8 +148,48 @@ function katalog_yaz(array $k): void {
     $k['markalar'] = array_values($k['markalar']);
     usort($k['markalar'], $sirala);
     $k['guncelleme'] = date('c');
+    $k['panel'] = true;   // panelde düzenlendi: kaynak/katalog betikleri --zorla olmadan üzerine yazmaz
     $json = json_encode($k, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     file_put_contents(KATALOG_JSON . '.tmp', $json, LOCK_EX); rename(KATALOG_JSON . '.tmp', KATALOG_JSON);
+    katalog_bol($k);
+}
+
+/** Siteye giden parçalar: veri/katalog/index.json (marka → model → yıl aralıkları) + marka başına <d>.json (versiyonlar).
+    kaynak/katalog/katalog_bol.py ile aynı biçim. */
+function katalog_anahtar(string $s): string {
+    $s = mb_strtolower(strtr($s, ['I' => 'ı', 'İ' => 'i']));
+    $s = strtr($s, ['ı' => 'i', 'ğ' => 'g', 'ü' => 'u', 'ş' => 's', 'ö' => 'o', 'ç' => 'c', 'é' => 'e', '&' => 'e', '°' => 'o']);
+    $s = trim((string)preg_replace('/[^a-z0-9]+/', '-', $s), '-');
+    return $s === '' ? 'marka' : $s;
+}
+function katalog_aralik_birlestir(array $a): array {
+    $a = array_values(array_filter($a, fn($x) => is_array($x) && count($x) === 2));
+    usort($a, fn($x, $y) => $x[0] <=> $y[0]); $o = [];
+    foreach ($a as $x) {
+        $i = count($o) - 1;
+        if ($i >= 0 && ($o[$i][1] === null || $x[0] <= $o[$i][1] + 1)) { $o[$i][1] = ($o[$i][1] === null || $x[1] === null) ? null : max($o[$i][1], $x[1]); }
+        else { $o[] = [$x[0], $x[1]]; }
+    }
+    return $o;
+}
+function katalog_bol(array $k): void {
+    $klasor = VERI_KLASOR . '/katalog';
+    if (!is_dir($klasor)) { mkdir($klasor, 0755, true); }
+    $index = ['guncelleme' => $k['guncelleme'] ?? date('c'), 'markalar' => []]; $kullanilan = []; $yazilan = [];
+    foreach ($k['markalar'] as $m) {
+        $d = katalog_anahtar($m['ad']); while (isset($kullanilan[$d])) { $d .= '-2'; } $kullanilan[$d] = 1;
+        $im = ['ad' => $m['ad'], 'd' => $d, 'modeller' => []];
+        foreach ($m['modeller'] as $md) {
+            $ar = array_map(fn($x) => $x['yil'], $md['motorlar'] ?? []);
+            if (!empty($md['yillar'])) { $ar[] = $md['yillar']; }
+            $im['modeller'][] = ['ad' => $md['ad'], 'y' => katalog_aralik_birlestir($ar)];
+        }
+        $index['markalar'][] = $im;
+        $dosya = $klasor . '/' . $d . '.json'; $yazilan[] = basename($dosya);
+        file_put_contents($dosya . '.tmp', json_encode(['modeller' => $m['modeller']], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX); rename($dosya . '.tmp', $dosya);
+    }
+    file_put_contents($klasor . '/index.json.tmp', json_encode($index, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX); rename($klasor . '/index.json.tmp', $klasor . '/index.json');
+    foreach (glob($klasor . '/*.json') ?: [] as $f) { if (basename($f) !== 'index.json' && !in_array(basename($f), $yazilan, true)) { @unlink($f); } }   // silinen markalar
 }
 
 function sablon_son(): void { echo "</main></body></html>"; }
