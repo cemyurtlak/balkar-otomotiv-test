@@ -12,6 +12,8 @@ const FOTO        = VERI_KLASOR . '/foto';
 const SIFRE_DOSYA = __DIR__ . '/sifre.php';
 const KATALOG_JSON = VERI_KLASOR . '/katalog.json';         // aracını sat formunun araç kataloğu (katalog.php)
 const TEKLIF_KLASOR = VERI_KLASOR . '/teklifler';           // aracını sat teklif kayıtları (teklifler.php)
+const SIPARIS_KLASOR = VERI_KLASOR . '/siparisler';         // ön sipariş (araç arama) talepleri (siparisler.php)
+const SIPARIS_DURUMLARI = ['yeni' => 'Yeni', 'araniyor' => 'Araç aranıyor', 'onerildi' => 'Araç önerildi', 'satildi' => 'Satış yapıldı', 'kapandi' => 'Kapandı'];
 const TEKLIF_DURUMLARI = ['yeni' => 'Yeni', 'arandi' => 'Arandı', 'teklif' => 'Teklif verildi', 'alindi' => 'Araç alındı', 'kapandi' => 'Kapandı'];
 const KATEGORILER = ['otomobil' => 'Otomobil', 'suv' => 'Arazi, SUV & Pickup', 'motosiklet' => 'Motosiklet', 'ticari' => 'Ticari araç'];
 const YAKITLAR    = ['' => '—', 'benzin' => 'Benzin', 'dizel' => 'Dizel', 'hibrit' => 'Hibrit', 'elektrik' => 'Elektrik', 'lpg' => 'Benzin & LPG'];
@@ -112,7 +114,7 @@ function sablon_bas(string $baslik): void { ?>
 <meta name="robots" content="noindex,nofollow"><title><?= h($baslik) ?> – Balkar Yönetim</title>
 <link rel="icon" href="../varliklar/img/favicon-32.png"><link rel="stylesheet" href="yonetim.css"></head><body>
 <header class="y-ust"><a class="y-marka" href="index.php"><img src="../varliklar/img/logo-96.png" alt="" width="36" height="36">Balkar Yönetim</a>
-<?php if (giris_var()): $yeni_teklif = yeni_teklif_sayisi(); ?><nav><a href="index.php">Araçlar</a><a href="index.php?s=duzenle">Araç ekle</a><a href="index.php?s=aktar">Sahibinden dosyası yükle</a><a href="teklifler.php">Teklifler<?php if ($yeni_teklif): ?> <span class="y-rozet" title="Yeni teklif"><?= $yeni_teklif ?></span><?php endif; ?></a><a href="katalog.php">Araç kataloğu</a><a href="index.php?s=yedek">Yedekler</a><a href="../tr/araclar.html" target="_blank">Siteyi aç</a>
+<?php if (giris_var()): $yeni_teklif = yeni_teklif_sayisi(); $yeni_siparis = yeni_siparis_sayisi(); ?><nav><a href="index.php">Araçlar</a><a href="index.php?s=duzenle">Araç ekle</a><a href="index.php?s=aktar">Sahibinden dosyası yükle</a><a href="teklifler.php">Teklifler<?php if ($yeni_teklif): ?> <span class="y-rozet" title="Yeni teklif"><?= $yeni_teklif ?></span><?php endif; ?></a><a href="siparisler.php">Ön siparişler<?php if ($yeni_siparis): ?> <span class="y-rozet" title="Yeni ön sipariş"><?= $yeni_siparis ?></span><?php endif; ?></a><a href="katalog.php">Araç kataloğu</a><a href="index.php?s=yedek">Yedekler</a><a href="../tr/araclar.html" target="_blank">Siteyi aç</a>
 <form method="post" action="index.php?s=cikis"><?= csrf_alan() ?><button>Çıkış</button></form></nav><?php endif; ?></header>
 <main class="y-kap">
 <?php }
@@ -120,6 +122,16 @@ function sablon_bas(string $baslik): void { ?>
 function yeni_teklif_sayisi(): int {
     $n = 0;
     foreach (glob(TEKLIF_KLASOR . '/*/*.json') ?: [] as $f) {
+        $v = json_decode((string)@file_get_contents($f), true);
+        if (is_array($v) && ($v['durum'] ?? 'yeni') === 'yeni') { $n++; }
+    }
+    return $n;
+}
+
+/** Durumu "yeni" olan ön sipariş sayısı (menü rozeti). */
+function yeni_siparis_sayisi(): int {
+    $n = 0;
+    foreach (glob(SIPARIS_KLASOR . '/*/*.json') ?: [] as $f) {
         $v = json_decode((string)@file_get_contents($f), true);
         if (is_array($v) && ($v['durum'] ?? 'yeni') === 'yeni') { $n++; }
     }

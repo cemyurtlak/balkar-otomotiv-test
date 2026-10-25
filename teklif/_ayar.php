@@ -95,3 +95,29 @@ function t_hiz_siniri(string $klasor, string $ad, int $saatlik, int $gunluk, int
     ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($sinir)); flock($fp, LOCK_UN); fclose($fp);
     return $red === null;
 }
+
+/* ---------- Ön sipariş kayıtları (Aşama 39): siparis.php yazar, yönetim paneli (siparisler.php) okur.
+   KVKK metninde 180 gün yazılıdır (aracını sat ile aynı süre); süre değişirse 4 dilde KVKK metni de güncellenmelidir. */
+const S_KAYIT_SAKLAMA_GUN = 180;
+const S_KAYIT_IP_SAATLIK  = 6;              // aynı IP'den saatte en fazla 6 talep
+const S_KAYIT_IP_GUNLUK   = 20;             // aynı IP'den günde en fazla 20 talep
+const S_KAYIT_GENEL_GUNLUK = 300;           // tüm site için günde en fazla 300 talep
+define('S_KAYIT_KLASOR', dirname(__DIR__) . '/veri/siparisler');
+
+function s_kayit_no_gecerli(string $no): bool { return (bool)preg_match('/^S\d{6}-[A-Z0-9]{4}$/', $no); }
+
+function s_kayit_klasor_hazirla(): void {
+    if (!is_dir(S_KAYIT_KLASOR)) { mkdir(S_KAYIT_KLASOR, 0755, true); }
+    if (!is_file(S_KAYIT_KLASOR . '/.htaccess')) { file_put_contents(S_KAYIT_KLASOR . '/.htaccess', "Require all denied\n"); }
+    if (!is_file(S_KAYIT_KLASOR . '/index.html')) { file_put_contents(S_KAYIT_KLASOR . '/index.html', ''); }
+}
+
+/** 180 günden eski ön sipariş kayıtlarını ve boş ay klasörlerini siler. */
+function s_kayit_temizle(): void {
+    $sinir = time() - S_KAYIT_SAKLAMA_GUN * 86400;
+    foreach (glob(S_KAYIT_KLASOR . '/*', GLOB_ONLYDIR) ?: [] as $ay) {
+        if (!preg_match('/^\d{4}-\d{2}$/', basename($ay))) { continue; }
+        foreach (glob($ay . '/*.json') ?: [] as $f) { if (filemtime($f) < $sinir) { @unlink($f); } }
+        if (!(glob($ay . '/*.json') ?: [])) { @rmdir($ay); }
+    }
+}

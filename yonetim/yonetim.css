@@ -91,3 +91,7 @@ h2 { font-size: 1.1rem; margin: 0 0 12px; }
 .y-sekme a[aria-current] { background: var(--a); border-color: var(--a); color: #1a1408; }
 .y-yeni td:first-child { box-shadow: inset 3px 0 0 var(--a); }
 .y-durum-form { margin: 0; } .y-durum-form select { min-height: 34px; padding: 4px 8px; font-size: .85rem; }
+/* Aşama 39: ön siparişler */
+.y-durum-araniyor { border-color: #6b8fc9; color: #b9cdf0; } .y-durum-onerildi { border-color: #c99a3a; color: #f0d79a; }
+.y-durum-satildi { border-color: #4f8a3a; color: #b6e0a0; }
+.y-uygun { margin: 0; padding-left: 18px; display: grid; gap: 6px; } .y-uygun small { opacity: .75; }
