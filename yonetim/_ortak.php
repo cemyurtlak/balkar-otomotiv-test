@@ -10,6 +10,9 @@ const ARAC_JS     = VERI_KLASOR . '/araclar.js';
 const YEDEK       = VERI_KLASOR . '/yedek';
 const FOTO        = VERI_KLASOR . '/foto';
 const SIFRE_DOSYA = __DIR__ . '/sifre.php';
+const KATALOG_JSON = VERI_KLASOR . '/katalog.json';         // aracını sat formunun araç kataloğu (katalog.php)
+const TEKLIF_KLASOR = VERI_KLASOR . '/teklifler';           // aracını sat teklif kayıtları (teklifler.php)
+const TEKLIF_DURUMLARI = ['yeni' => 'Yeni', 'arandi' => 'Arandı', 'teklif' => 'Teklif verildi', 'alindi' => 'Araç alındı', 'kapandi' => 'Kapandı'];
 const KATEGORILER = ['otomobil' => 'Otomobil', 'suv' => 'Arazi, SUV & Pickup', 'motosiklet' => 'Motosiklet', 'ticari' => 'Ticari araç'];
 const YAKITLAR    = ['' => '—', 'benzin' => 'Benzin', 'dizel' => 'Dizel', 'hibrit' => 'Hibrit', 'elektrik' => 'Elektrik', 'lpg' => 'Benzin & LPG'];
 const VITESLER    = ['' => '—', 'otomatik' => 'Otomatik', 'manuel' => 'Manuel', 'yari_otomatik' => 'Yarı otomatik'];
@@ -109,10 +112,46 @@ function sablon_bas(string $baslik): void { ?>
 <meta name="robots" content="noindex,nofollow"><title><?= h($baslik) ?> – Balkar Yönetim</title>
 <link rel="icon" href="../varliklar/img/favicon-32.png"><link rel="stylesheet" href="yonetim.css"></head><body>
 <header class="y-ust"><a class="y-marka" href="index.php"><img src="../varliklar/img/logo-96.png" alt="" width="36" height="36">Balkar Yönetim</a>
-<?php if (giris_var()): ?><nav><a href="index.php">Araçlar</a><a href="index.php?s=duzenle">Araç ekle</a><a href="index.php?s=aktar">Sahibinden dosyası yükle</a><a href="index.php?s=yedek">Yedekler</a><a href="../tr/araclar.html" target="_blank">Siteyi aç</a>
+<?php if (giris_var()): $yeni_teklif = yeni_teklif_sayisi(); ?><nav><a href="index.php">Araçlar</a><a href="index.php?s=duzenle">Araç ekle</a><a href="index.php?s=aktar">Sahibinden dosyası yükle</a><a href="teklifler.php">Teklifler<?php if ($yeni_teklif): ?> <span class="y-rozet" title="Yeni teklif"><?= $yeni_teklif ?></span><?php endif; ?></a><a href="katalog.php">Araç kataloğu</a><a href="index.php?s=yedek">Yedekler</a><a href="../tr/araclar.html" target="_blank">Siteyi aç</a>
 <form method="post" action="index.php?s=cikis"><?= csrf_alan() ?><button>Çıkış</button></form></nav><?php endif; ?></header>
 <main class="y-kap">
 <?php }
+/** Durumu "yeni" olan teklif sayısı (menü rozeti). */
+function yeni_teklif_sayisi(): int {
+    $n = 0;
+    foreach (glob(TEKLIF_KLASOR . '/*/*.json') ?: [] as $f) {
+        $v = json_decode((string)@file_get_contents($f), true);
+        if (is_array($v) && ($v['durum'] ?? 'yeni') === 'yeni') { $n++; }
+    }
+    return $n;
+}
+
+/* ---------- araç kataloğu (aracını sat formu) */
+function katalog_oku(): array {
+    if (!is_file(KATALOG_JSON)) { return ['surum' => 1, 'guncelleme' => date('c'), 'markalar' => []]; }
+    $v = json_decode((string)file_get_contents(KATALOG_JSON), true);
+    return is_array($v) && isset($v['markalar']) && is_array($v['markalar']) ? $v : ['surum' => 1, 'guncelleme' => date('c'), 'markalar' => []];
+}
+/** Kataloğu kaydeder: önce yedek alır (son 30 yedek tutulur), sıralar, atomik yazar. */
+function katalog_yaz(array $k): void {
+    if (!is_dir(YEDEK)) { mkdir(YEDEK, 0755, true); }
+    if (is_file(KATALOG_JSON)) {
+        copy(KATALOG_JSON, YEDEK . '/katalog-' . date('Ymd-His') . '.json');
+        $yedekler = glob(YEDEK . '/katalog-*.json') ?: [];
+        sort($yedekler);
+        while (count($yedekler) > 30) { @unlink(array_shift($yedekler)); }
+    }
+    $sirala = fn($a, $b) => strcmp(mb_strtolower($a['ad']), mb_strtolower($b['ad']));
+    foreach ($k['markalar'] as &$m) { $m['modeller'] = array_values($m['modeller']); usort($m['modeller'], $sirala);
+        foreach ($m['modeller'] as &$md) { $md['motorlar'] = array_values($md['motorlar']); } unset($md); }
+    unset($m);
+    $k['markalar'] = array_values($k['markalar']);
+    usort($k['markalar'], $sirala);
+    $k['guncelleme'] = date('c');
+    $json = json_encode($k, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    file_put_contents(KATALOG_JSON . '.tmp', $json, LOCK_EX); rename(KATALOG_JSON . '.tmp', KATALOG_JSON);
+}
+
 function sablon_son(): void { echo "</main></body></html>"; }
 function mesaj(): void {
     if (!empty($_SESSION['mesaj'])) { echo '<p class="y-mesaj">' . h($_SESSION['mesaj']) . '</p>'; unset($_SESSION['mesaj']); }

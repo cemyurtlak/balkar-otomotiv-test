@@ -559,3 +559,49 @@ button[disabled] { opacity: .7; cursor: progress; }
   .magaza.logolu img { width: 60px; height: 60px; }
   .magaza.logolu:hover { background: transparent; transform: translateY(-3px) scale(1.04); }
 }
+
+/* ---------- aracını sat: 5 adımlı teklif formu (Aşama 34) */
+.gizli-baslik { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.teklif-form fieldset.teklif-adim, .teklif-form section.teklif-adim { border: 0; padding: 0; margin: 0; min-width: 0; }
+.teklif-adimlar { list-style: none; margin: 0 0 6px; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; counter-reset: none; }
+.teklif-adimlar li { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-size: .74rem; color: var(--soluk); position: relative; }
+.teklif-adimlar li::before { content: ""; position: absolute; top: 15px; left: calc(-50% + 18px); right: calc(50% + 18px); height: 2px; background: var(--cizgi-guclu); }
+.teklif-adimlar li:first-child::before { display: none; }
+.teklif-adimlar li.tamam::before, .teklif-adimlar li[aria-current]::before { background: var(--altin); }
+.teklif-adim-no { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: .9rem; border: 2px solid var(--cizgi-guclu); background: var(--zemin-2); color: var(--soluk); position: relative; }
+.teklif-adimlar li.tamam .teklif-adim-no { background: var(--altin); border-color: var(--altin); color: #1a1408; }
+.teklif-adimlar li[aria-current] .teklif-adim-no { border-color: var(--altin); color: var(--altin-metin, var(--altin-acik)); box-shadow: 0 0 0 4px #cfa65133; }
+.teklif-adimlar li[aria-current] { color: inherit; font-weight: 600; }
+.teklif-adim-ad { line-height: 1.25; }
+@media (max-width: 560px) { .teklif-adim-ad { display: none; } }
+.teklif-sayac { margin: 4px 0 18px; font-size: .85rem; color: var(--soluk); text-align: center; }
+@media (min-width: 561px) { .teklif-sayac { display: none; } }
+.teklif-form .form-uyari[data-katalog-durum] { margin-bottom: 14px; }
+.teklif-elle { margin-top: 6px; }
+.alan select:disabled { opacity: .55; cursor: not-allowed; }
+.secim-satir { gap: 6px; margin-bottom: 0; align-items: center; }
+.secim-kucuk span { min-height: 38px; padding: 0 14px; font-size: .88rem; }
+.parca-kutu { border: 1px solid var(--cizgi-guclu); border-radius: var(--r-orta); padding: 14px 16px 16px; margin: 0 0 16px; min-width: 0; }
+.parca-kutu legend { font-weight: 600; padding: 0 6px; }
+.parca-kutu .alan-ipucu { margin: 0 0 10px; }
+.parca-izgara { display: grid; gap: 8px 14px; grid-template-columns: 1fr; }
+@media (min-width: 620px) { .parca-izgara { grid-template-columns: 1fr 1fr; } }
+.parca { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .9rem; padding: 6px 8px 6px 12px; border-radius: var(--r-kucuk); border: 1px solid var(--cizgi); }
+.parca select { font: inherit; font-size: .86rem; color: inherit; background: var(--yuzey, var(--zemin)); border: 1px solid var(--cizgi-guclu); border-radius: 8px; padding: 6px 8px; min-height: 36px; max-width: 58%; }
+.parca[data-durum="lokal"], .parca[data-durum="boyali"] { border-color: #d9a23a; background: #d9a23a14; }
+.parca[data-durum="degisen"] { border-color: #d0574a; background: #d0574a14; }
+.teklif-ozet { margin: 0 0 12px; display: grid; gap: 12px; }
+.teklif-ozet-bolum { border: 1px solid var(--cizgi); border-radius: var(--r-orta); padding: 12px 16px; }
+.teklif-ozet-bas { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+.teklif-ozet-bas h3 { margin: 0; font: 600 1rem/1.3 var(--yazi-baslik); }
+.teklif-duzenle { background: none; border: 1px solid var(--cizgi-guclu); color: inherit; border-radius: 999px; padding: 4px 12px; font: inherit; font-size: .82rem; cursor: pointer; }
+.teklif-duzenle:hover { border-color: var(--altin); }
+.teklif-ozet-bolum > div:not(.teklif-ozet-bas) { display: grid; grid-template-columns: minmax(110px, 38%) 1fr; gap: 10px; padding: 5px 0; border-top: 1px dashed var(--cizgi); font-size: .9rem; }
+.teklif-ozet dt { color: var(--soluk); }
+.teklif-ozet dd { margin: 0; overflow-wrap: anywhere; }
+.teklif-tesekkur { padding: 12px 16px; border-radius: var(--r-orta); background: #4f8a3a22; border: 1px solid #4f8a3a88; font-weight: 500; }
+.teklif-dugmeler { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; margin: 18px 0 10px; }
+.teklif-dugmeler [data-teklif-ileri], .teklif-dugmeler [data-teklif-gonder] { margin-left: auto; }
+.teklif-dugmeler .dugme[disabled] { opacity: .6; cursor: wait; }
+.teklif-form { scroll-margin-top: 96px; }
+@media (min-width: 561px) { .teklif-adimlar { margin-bottom: 24px; } }

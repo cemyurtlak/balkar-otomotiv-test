@@ -66,3 +66,28 @@ summary { cursor: pointer; color: var(--a); margin-bottom: 10px; }
 .y-secim input { min-height: 0; padding: 0; width: auto; accent-color: var(--a); }
 .y-secim label { display: flex !important; flex-direction: row !important; align-items: center; justify-content: flex-start; gap: 8px; margin: 0; text-align: left; }
 .y-tablo td:last-child .y-secim { justify-items: start; }
+
+/* araç kataloğu ve teklifler (Aşama 34) */
+h2 { font-size: 1.1rem; margin: 0 0 12px; }
+.y-yol { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-bottom: 14px; color: var(--s); font-size: .9rem; }
+.y-yol-sag { margin-left: auto; }
+.y-satir { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.y-satir label { margin-bottom: 0; min-width: 240px; flex: 1; }
+.y-sil { margin: 14px 0 0; } .y-sil summary { color: #f08a7a; } .y-sil form { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.y-sil .y-onay { margin: 0; }
+.y-secili td { background: #cfa65118; }
+.y-rozet-uyari { background: #8a5a12; color: #fde7b8; }
+.y-durum { border-radius: 999px; padding: 4px 12px; font-size: .85rem; border: 1px solid var(--c); }
+.y-durum-yeni { background: var(--a); color: #1a1408; border-color: var(--a); }
+.y-durum-arandi { border-color: #6b8fc9; color: #b9cdf0; } .y-durum-teklif { border-color: #c99a3a; color: #f0d79a; }
+.y-durum-alindi { border-color: #4f8a3a; color: #b6e0a0; } .y-durum-kapandi { opacity: .6; }
+.y-detay { display: grid; gap: 0 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.y-dl { display: grid; grid-template-columns: minmax(110px, 36%) 1fr; gap: 6px 12px; margin: 0 0 12px; }
+.y-dl dt { color: var(--s); } .y-dl dd { margin: 0; overflow-wrap: anywhere; }
+.y-dugmeler { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
+.y-parca { margin: 0; padding-left: 18px; } .y-parca-degisen b { color: #f08a7a; } .y-parca-boyali b, .y-parca-lokal b { color: #f0c36a; }
+.y-sekme { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.y-sekme a { text-decoration: none; color: var(--m); border: 1px solid var(--c); border-radius: 999px; padding: 4px 12px; font-size: .88rem; }
+.y-sekme a[aria-current] { background: var(--a); border-color: var(--a); color: #1a1408; }
+.y-yeni td:first-child { box-shadow: inset 3px 0 0 var(--a); }
+.y-durum-form { margin: 0; } .y-durum-form select { min-height: 34px; padding: 4px 8px; font-size: .85rem; }

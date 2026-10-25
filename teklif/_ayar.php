@@ -44,3 +44,54 @@ function t_klasor_boyutu(): int {
     foreach (glob(T_KLASOR . '/*/*.jpg') ?: [] as $f) { $top += (int)filesize($f); }
     return $top;
 }
+
+/* ---------- Aracını sat teklif kayıtları (Aşama 34): kaydet.php yazar, yönetim paneli (teklifler.php) okur.
+   KVKK metninde 180 gün yazılıdır; süre değişirse 4 dilde KVKK metni de güncellenmelidir. */
+const T_KAYIT_SAKLAMA_GUN = 180;            // teklif kayıtları 180 gün sonra otomatik silinir
+const T_KAYIT_IP_SAATLIK  = 6;              // aynı IP'den saatte en fazla 6 teklif
+const T_KAYIT_IP_GUNLUK   = 20;             // aynı IP'den günde en fazla 20 teklif
+const T_KAYIT_GENEL_GUNLUK = 300;           // tüm site için günde en fazla 300 teklif
+const T_KAYIT_MAKS_BAYT   = 20 * 1024;      // istek gövdesi en fazla 20 KB
+define('T_KAYIT_KLASOR', dirname(__DIR__) . '/veri/teklifler');
+
+function t_kayit_no_gecerli(string $no): bool { return (bool)preg_match('/^\d{6}-[A-Z0-9]{4}$/', $no); }
+
+/** Kayıt klasörünü hazırlar (web'den erişim kapalı). */
+function t_kayit_klasor_hazirla(): void {
+    if (!is_dir(T_KAYIT_KLASOR)) { mkdir(T_KAYIT_KLASOR, 0755, true); }
+    $ht = T_KAYIT_KLASOR . '/.htaccess';
+    if (!is_file($ht)) { file_put_contents($ht, "Require all denied\n"); }
+    if (!is_file(T_KAYIT_KLASOR . '/index.html')) { file_put_contents(T_KAYIT_KLASOR . '/index.html', ''); }
+}
+
+/** 180 günden eski teklif kayıtlarını ve boş ay klasörlerini siler. */
+function t_kayit_temizle(): void {
+    $sinir = time() - T_KAYIT_SAKLAMA_GUN * 86400;
+    foreach (glob(T_KAYIT_KLASOR . '/*', GLOB_ONLYDIR) ?: [] as $ay) {
+        if (!preg_match('/^\d{4}-\d{2}$/', basename($ay))) { continue; }
+        foreach (glob($ay . '/*.json') ?: [] as $f) {
+            if (filemtime($f) < $sinir) { @unlink($f); }
+        }
+        if (!(glob($ay . '/*.json') ?: [])) { @rmdir($ay); }
+    }
+}
+
+/** IP'nin tuzlu özeti ile basit hız sınırı. $dosya içinde son 24 saatin zamanları tutulur. true = izin var. */
+function t_hiz_siniri(string $klasor, string $ad, int $saatlik, int $gunluk, int $genel, ?string &$red = null): bool {
+    $tuz_dosya = $klasor . '/.tuz';
+    if (!is_file($tuz_dosya)) { file_put_contents($tuz_dosya, bin2hex(random_bytes(16))); }
+    $ip = hash('sha256', trim((string)file_get_contents($tuz_dosya)) . '|' . ($_SERVER['REMOTE_ADDR'] ?? ''));
+    $fp = fopen($klasor . '/' . $ad, 'c+');
+    if (!$fp) { return true; }
+    flock($fp, LOCK_EX);
+    $sinir = json_decode((string)stream_get_contents($fp), true) ?: [];
+    $simdi = time();
+    foreach ($sinir as $k => $z) { $sinir[$k] = array_values(array_filter((array)$z, fn($x) => $x > $simdi - 86400)); if (!$sinir[$k]) { unset($sinir[$k]); } }
+    $benim = $sinir[$ip] ?? [];
+    $red = null;
+    if (count(array_filter($benim, fn($x) => $x > $simdi - 3600)) >= $saatlik || count($benim) >= $gunluk) { $red = 'sinir'; }
+    elseif (array_sum(array_map('count', $sinir)) >= $genel) { $red = 'yogun'; }
+    if (!$red) { $sinir[$ip][] = $simdi; }
+    ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($sinir)); flock($fp, LOCK_UN); fclose($fp);
+    return $red === null;
+}

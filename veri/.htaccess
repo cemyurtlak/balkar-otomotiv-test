@@ -1,6 +1,6 @@
-# yedekler ve aktarım dosyaları dışarıdan okunamaz
+# yedekler, aktarım dosyaları ve teklif kayıtları dışarıdan okunamaz
 Options -Indexes
-RedirectMatch 403 ^/veri/yedek/
+RedirectMatch 403 /veri/(yedek|teklifler)/
 <FilesMatch "\.(php|phtml|phar)$">
   Require all denied
 </FilesMatch>
