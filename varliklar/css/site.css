@@ -669,3 +669,17 @@ button[disabled] { opacity: .7; cursor: progress; }
   .kahraman-sag { margin-top: 10px; }   /* öne çıkan ilan eskisinden yukarıda (sütun üstten hizalı) */
   .kahraman-metin { padding-top: 4px; }
 }
+/* Aşama 45: masaüstünde başlık küçültüldü (ödeme kartı ilk ekrana sığsın); sağ sütun dikeyde ortalı */
+@media (min-width: 960px) {
+  .kahraman-baslik { font-size: clamp(2rem, 3.3vw, 3.05rem); margin-bottom: 0; }
+  .kahraman-baslik::after { margin-top: 16px; }
+  .kahraman-ust { margin-bottom: 12px; }
+  .kahraman-reklam { margin-top: 20px; }
+  .kahraman-ic { align-items: center; }
+  .kahraman-sag { margin-top: 0; align-self: center; }
+}
+@media (min-width: 960px) {
+  .kahraman-ic { padding-top: 22px; }
+  .kahraman-sag .kahraman-arac { min-height: 0; }
+  .kahraman-sag .one-cikan .foto { aspect-ratio: 16 / 10; }
+}
