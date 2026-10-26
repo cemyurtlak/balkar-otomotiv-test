@@ -635,3 +635,15 @@ button[disabled] { opacity: .7; cursor: progress; }
 .siparis-cagri { margin: 18px 0 0; padding: 14px 18px; border: 1px dashed var(--cizgi-guclu); border-radius: var(--r-orta); display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
 .siparis-dis { padding-block: clamp(20px, 3vw, 32px); }
 @media (min-width: 1280px) and (max-width: 1439px) { .menu { gap: 16px; } }  /* Aşama 39: 9 menü öğesi (DE) sığsın */
+
+/* ---------- Aşama 42: anasayfa ödeme reklam bandı (güven şeridinin altında) */
+.kredi-reklam-dis { padding-top: 18px; }
+.kredi-reklam { position: relative; overflow: hidden; }
+.kredi-reklam::after { content: ""; position: absolute; inset: auto -60px -80px auto; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, #c9a24e33, transparent 70%); pointer-events: none; }
+.kredi-reklam-metin { flex: 1 1 420px; min-width: 0; }
+.kredi-reklam-ust { display: inline-block; margin: 0 0 10px; padding: 4px 12px; border-radius: 999px; background: var(--altin); color: #1a1408; font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; }
+.kredi-reklam .bolum-alt { margin-bottom: 0; }
+.kredi-rozetler { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.kredi-rozetler li { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #c9a24e80; font-weight: 600; font-size: .9rem; }
+.kredi-rozetler svg { width: 18px; height: 18px; color: var(--altin); flex: none; }
+.kredi-reklam > .dugme { position: relative; z-index: 1; }

@@ -115,7 +115,7 @@
 .kahraman + section { margin-top: 28px; }
 
 /* krem ↔ altın geçişli bölümler (anasayfa). Aşama 41: sıra numarası yerine sınıfla (gecis-ka = krem→altın, gecis-ak = altın→krem);
-   araya yeni bölüm girince renkler kaymasın diye. Sıra: vitrin ka, ön sipariş bandı ak, [lacivert "nasıl yürür"], adımlar ka, yorumlar ak, kredi ka, rehber ak, iletişim ka.
+   araya yeni bölüm girince renkler kaymasın diye. Sıra: [güven, ödeme reklam bandı: düz], vitrin ka, ön sipariş bandı ak, [lacivert "nasıl yürür"], adımlar ka, yorumlar ak, rehber ka, iletişim ak (Aşama 42).
    Geçişler düz dikey (180°): border-image alanı ekranın 3 katı genişlikte olduğundan açılı geçiş yatay kayar.
    Yön sırayla değişir: bir bölüm altınla bitiyorsa sonraki altınla başlar, sınırlarda kopma olmaz. */
 .sayfa-anasayfa #icerik > section.gecis-ka {
