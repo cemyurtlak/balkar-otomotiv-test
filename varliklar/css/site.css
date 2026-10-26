@@ -644,6 +644,28 @@ button[disabled] { opacity: .7; cursor: progress; }
 .kredi-reklam-ust { display: inline-block; margin: 0 0 10px; padding: 4px 12px; border-radius: 999px; background: var(--altin); color: #1a1408; font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; }
 .kredi-reklam .bolum-alt { margin-bottom: 0; }
 .kredi-rozetler { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.kredi-rozetler li { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #c9a24e80; font-weight: 600; font-size: .9rem; }
-.kredi-rozetler svg { width: 18px; height: 18px; color: var(--altin); flex: none; }
+.kredi-rozetler li, .kredi-rozet { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #c9a24e80; font-weight: 600; font-size: .9rem; }
+.kredi-rozetler svg, .kredi-rozet svg { width: 18px; height: 18px; color: var(--altin); flex: none; }
 .kredi-reklam > .dugme { position: relative; z-index: 1; }
+
+/* ---------- Aşama 44: ödeme reklam kartı kahramanın sol sütununda; açıklama + düğmeler sağda, öne çıkan aracın altında */
+.kahraman-reklam { display: block; position: relative; overflow: hidden; margin: 22px 0 8px; padding: 20px 22px; border-radius: var(--r-orta);
+  text-decoration: none; color: var(--metin); border: 1px solid #c9a24e80; background: linear-gradient(120deg, #1b3762 0%, #0e1626 70%, #15120c 100%); box-shadow: 0 24px 48px -24px #000c; transition: border-color .2s, transform .3s; }
+.kahraman-reklam::after { content: ""; position: absolute; right: -50px; bottom: -70px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, #c9a24e38, transparent 70%); pointer-events: none; }
+.kahraman-reklam:hover { border-color: var(--altin); transform: translateY(-2px); }
+.kahraman-reklam .kredi-reklam-ust { margin-bottom: 8px; font-size: .72rem; }
+.kahraman-reklam-baslik { display: block; font: 700 clamp(1.15rem, 2vw, 1.45rem)/1.2 var(--yazi-baslik); color: #f6f0e4; margin-bottom: 6px; }
+.kahraman-reklam-alt { display: block; color: #c9d1e0; font-size: .92rem; max-width: 36em; }
+.kahraman-reklam .kredi-rozetler { margin-top: 12px; gap: 6px; }
+.kahraman-reklam .kredi-rozet { padding: 6px 11px; font-size: .82rem; color: #f6f0e4; }
+.kahraman-reklam .kredi-rozet svg { width: 16px; height: 16px; }
+.kahraman-reklam-dugme { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-weight: 700; font-size: .9rem; color: var(--altin-acik, #e9cf8e); }
+.kahraman-reklam-dugme svg { width: 16px; height: 16px; }
+.kahraman-sag { display: grid; gap: 18px; align-content: start; }
+.kahraman-sag .kahraman-alt { margin: 0; font-size: 1rem; }
+.kahraman-sag .dugmeler { margin: 0; }
+@media (min-width: 960px) {
+  .kahraman-ic { align-items: start; }
+  .kahraman-sag { margin-top: 10px; }   /* öne çıkan ilan eskisinden yukarıda (sütun üstten hizalı) */
+  .kahraman-metin { padding-top: 4px; }
+}
