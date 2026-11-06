@@ -4,6 +4,7 @@
    Kayıt başarısız olsa da müşterinin WhatsApp mesajı yine açılır (form müşteriye WhatsApp'ı göndermesini söyler). */
 declare(strict_types=1);
 require __DIR__ . '/_ayar.php';
+require __DIR__ . '/_db.php';
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
@@ -74,4 +75,9 @@ $dosya = $ay . '/' . $no . '.json';
 if (is_file($dosya)) { cevap(['ok' => true, 'no' => $no, 'tekrar' => true]); }
 $yazildi = file_put_contents($dosya . '.tmp', json_encode($kayit, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), LOCK_EX);
 if ($yazildi === false || !rename($dosya . '.tmp', $dosya)) { cevap(['ok' => false, 'hata' => 'yazma'], 500); }
+// Aşama 49: veritabanına da yaz (başarısız olsa da yukarıdaki kayıt ve WhatsApp mesajı etkilenmez)
+$a = $kayit['arac'];
+db_talep_ekle(['tur' => 'siparis', 'no' => $no, 'dil' => $kayit['dil'], 'ad' => $ad, 'tel' => $tel,
+    'ozet' => trim(($a['marka'] ?: 'Farketmez') . ' ' . $a['model'] . ' · bütçe ' . number_format((float)$butce_max, 0, ',', '.') . ' TL'),
+    'mesaj' => mb_substr(is_string($g['wa_mesaj'] ?? null) ? $g['wa_mesaj'] : '', 0, 6000), 'veri' => $kayit, 'sayfa' => 'on-siparis']);
 cevap(['ok' => true, 'no' => $no]);

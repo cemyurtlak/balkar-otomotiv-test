@@ -20,6 +20,35 @@
   function para(n) { return sayi(Math.round(n)) + " TL"; }
   function ikon(ad) { return '<svg aria-hidden="true"><use href="#i-' + ad + '"/></svg>'; }
   function wa(metin) { return "https://wa.me/" + AYAR.whatsapp + "?text=" + encodeURIComponent(metin); }
+  /* Aşama 49: WhatsApp'a giden her şeyin bir kopyası sunucudaki veritabanına (teklif/talep.php → panel "Tüm kayıtlar").
+     Yanıt beklenmez, hata yutulur: WhatsApp akışı hiçbir durumda etkilenmez. PHP olmayan sunucuda (GitHub Pages) istek boşa gider. */
+  var TALEP_UC = "../teklif/talep.php";
+  function talepKaydet(tur, mesaj, alanlar, tuzak) {
+    try {
+      if (!/^https?:$/.test(location.protocol) || !mesaj) { return; }
+      var yol = location.pathname.split("/").slice(-2).join("/") + location.search;
+      var govde = JSON.stringify({ tur: tur, mesaj: mesaj, alanlar: alanlar || {}, dil: DIL, sayfa: yol, web_adresi: tuzak || "" });
+      /* text/plain: sendBeacon bazı tarayıcılarda application/json gövdeyi reddeder; sunucu gövdeyi JSON olarak okur */
+      if (navigator.sendBeacon && navigator.sendBeacon(TALEP_UC, new Blob([govde], { type: "text/plain;charset=UTF-8" }))) { return; }
+      if (window.fetch) { fetch(TALEP_UC, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: govde, keepalive: true }).catch(function () {}); }
+    } catch (e) { /* kayıt olmasa da WhatsApp çalışır */ }
+  }
+  /* WhatsApp bağlantısı tıklamaları (araç sorusu, kredi, ödeme, aradığım araç, genel düğmeler). Formlar kendi kaydını yapar. */
+  function waTiklamalari() {
+    function kaydet(e) {
+      if (e.type === "auxclick" && e.button !== 1) { return; }
+      var a = e.target.closest && e.target.closest('a[href^="https://wa.me/"]');
+      if (!a) { return; }
+      var tur = a.hasAttribute("data-wa-arac") ? "arac" : a.hasAttribute("data-kredi-wa") ? "kredi" : a.hasAttribute("data-odeme-wa") ? "odeme" :
+        a.hasAttribute("data-wa-aradigim") ? "arama" : "genel";
+      if (a.closest("[data-siparis-form], [data-teklif-form]")) { return; }   // ön sipariş / aracını sat zaten kaydedildi
+      var mesaj = "";
+      try { mesaj = new URL(a.href).searchParams.get("text") || ""; } catch (x) { mesaj = ""; }
+      talepKaydet(tur, mesaj || t("ortak.wa_genel_mesaj"));
+    }
+    document.addEventListener("click", kaydet, true);
+    document.addEventListener("auxclick", kaydet, true);
+  }
   function anahtar(s) {
     return String(s || "").toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s").replace(/ö/g, "o").replace(/ç/g, "c").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
   }
@@ -563,6 +592,14 @@
           var v = el.tagName === "SELECT" ? (el.value ? el.options[el.selectedIndex].text : "") : String(el.value).trim();
           if (v) { satirlar.push(el.dataset.etiket + ": " + v); }
         });
+        var alanlar = {};
+        $$("[name]", form).forEach(function (el) {
+          if (!/^[a-z_]{1,30}$/.test(el.name) || el.name === "web_adresi" || el.type === "file") { return; }
+          if ((el.type === "radio" || el.type === "checkbox") && !el.checked) { return; }
+          var v = el.tagName === "SELECT" ? (el.value ? el.options[el.selectedIndex].text : "") : String(el.value).trim();
+          if (v) { alanlar[el.name] = v; }
+        });
+        talepKaydet(form.id === "randevu" ? "randevu" : "genel", satirlar.join("\n"), alanlar, ($('[name="web_adresi"]', form) || {}).value);
         gonder(form, satirlar);
       });
       fotoKutusu(form);
@@ -1036,17 +1073,21 @@
           return null;
         }).catch(function () { uyari.textContent = t("sayfalar.sat_foto_hata"); uyari.hidden = false; return null; });
       }
+      function waSatirlari(link) {
+        var satir = mesajSatirlari(no);
+        if (link) { satir.push("", t("sayfalar.sat_foto_wa") + " (" + fotolar.length + "): " + link); }
+        else if (fotolar.length) { satir.push("", t("sayfalar.sat_foto_wa") + ": " + fotolar.length); }
+        return satir;
+      }
       function kaydet(link) {
         if (!form.dataset.kaydet || !window.fetch) { return Promise.resolve(); }
-        return zamanli(form.dataset.kaydet, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(kayitVerisi(no, link)) }, 10000)
+        var veri = kayitVerisi(no, link); veri.wa_mesaj = waSatirlari(link).join("\n");   // Aşama 49: veritabanına mesajın kendisi de yazılır
+        return zamanli(form.dataset.kaydet, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) }, 10000)
           .catch(function () { /* kayıt olmasa da mesaj gider */ });
       }
       var fotoLink = null;
       fotoYukle().then(function (l) { fotoLink = l; return kaydet(l); }).catch(function () {}).then(function () {
-        var satir = mesajSatirlari(no);
-        if (fotoLink) { satir.push("", t("sayfalar.sat_foto_wa") + " (" + fotolar.length + "): " + fotoLink); }
-        else if (fotolar.length) { satir.push("", t("sayfalar.sat_foto_wa") + ": " + fotolar.length); }
-        var url = wa(satir.join("\n"));
+        var url = wa(waSatirlari(fotoLink).join("\n"));
         gonder.disabled = false; gonder.innerHTML = eski;
         gonderildi = true;
         $("[data-teklif-tesekkur]", form).hidden = false;
@@ -1403,7 +1444,7 @@
       function kaydet() {
         if (!form.dataset.kaydet || !window.fetch) { return Promise.resolve(false); }
         var iptal = window.AbortController ? new AbortController() : null, sure = setTimeout(function () { if (iptal) { iptal.abort(); } }, 10000);
-        return fetch(form.dataset.kaydet, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(kayitVerisi(no)), signal: iptal ? iptal.signal : undefined })
+        return fetch(form.dataset.kaydet, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify((function () { var v = kayitVerisi(no); v.wa_mesaj = mesajSatirlari(no).join("\n"); return v; })()), signal: iptal ? iptal.signal : undefined })
           .then(function (r) { clearTimeout(sure); return r.json().catch(function () { return {}; }); })
           .then(function (j) { return !!(j && j.ok); }, function () { clearTimeout(sure); return false; });
       }
@@ -1464,6 +1505,6 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    markaSecicileri(); arayuz(); anasayfa(); liste(); detay(); kredi(); formlar(); teklifFormu(); siparisFormu(); aramaPenceresi(); animasyonlar();
+    markaSecicileri(); arayuz(); anasayfa(); liste(); detay(); kredi(); formlar(); teklifFormu(); siparisFormu(); waTiklamalari(); aramaPenceresi(); animasyonlar();
   });
 })();

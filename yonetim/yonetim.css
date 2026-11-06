@@ -95,3 +95,7 @@ h2 { font-size: 1.1rem; margin: 0 0 12px; }
 .y-durum-araniyor { border-color: #6b8fc9; color: #b9cdf0; } .y-durum-onerildi { border-color: #c99a3a; color: #f0d79a; }
 .y-durum-satildi { border-color: #4f8a3a; color: #b6e0a0; }
 .y-uygun { margin: 0; padding-left: 18px; display: grid; gap: 6px; } .y-uygun small { opacity: .75; }
+
+/* Aşama 49: Tüm kayıtlar */
+.y-durum-goruldu { border-color: #6b8fc9; color: #b9cdf0; } .y-durum-donuldu { border-color: #4f8a3a; color: #b6e0a0; }
+.y-mesaj { white-space: pre-wrap; word-break: break-word; font: inherit; background: rgba(255,255,255,.04); border: 1px solid var(--c); border-radius: 10px; padding: 12px 14px; margin: 0 0 12px; }

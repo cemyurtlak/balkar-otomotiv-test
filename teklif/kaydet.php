@@ -4,6 +4,7 @@
    Kayıt başarısız olsa da müşterinin WhatsApp mesajı yine gönderilir (form bunu beklemez). */
 declare(strict_types=1);
 require __DIR__ . '/_ayar.php';
+require __DIR__ . '/_db.php';
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
@@ -78,4 +79,8 @@ $dosya = $ay . '/' . $no . '.json';
 if (is_file($dosya)) { cevap(['ok' => true, 'no' => $no, 'tekrar' => true]); }   // aynı teklif iki kez gönderildi
 $yazildi = file_put_contents($dosya . '.tmp', json_encode($kayit, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), LOCK_EX);
 if ($yazildi === false || !rename($dosya . '.tmp', $dosya)) { cevap(['ok' => false, 'hata' => 'yazma'], 500); }
+// Aşama 49: veritabanına da yaz (başarısız olsa da yukarıdaki kayıt ve WhatsApp mesajı etkilenmez)
+db_talep_ekle(['tur' => 'teklif', 'no' => $no, 'dil' => $kayit['dil'], 'ad' => $ad, 'tel' => $tel,
+    'ozet' => trim($marka . ' ' . $model . ' ' . $kayit['arac']['yil'] . ($kayit['arac']['km'] !== '' ? ' · ' . $kayit['arac']['km'] . ' km' : '')),
+    'mesaj' => mb_substr(is_string($g['wa_mesaj'] ?? null) ? $g['wa_mesaj'] : '', 0, 6000), 'veri' => $kayit, 'sayfa' => 'aracini-sat']);
 cevap(['ok' => true, 'no' => $no]);
